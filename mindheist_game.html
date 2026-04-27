@@ -690,6 +690,7 @@
       #screen-levels .levels-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -1009,16 +1010,280 @@ function RegtogglePassword() {
 /* ─────────────────────────────────────────────────────────────────
    STATE
 ───────────────────────────────────────────────────────────────── */
+const SUPABASE_URL  = 'YOUR_SUPABASE_URL';       // e.g. https://abcxyz.supabase.co
+const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';  // public anon key
+
+const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+/* ═══════════════════════════════════════════════════════════════════
+   DB — Supabase-backed data layer
+   Replaces the old localStorage DB object entirely.
+   All methods are async. UI callers are updated below.
+════════════════════════════════════════════════════════════════════ */
 const DB = {
-  users: JSON.parse(localStorage.getItem('mh_users') || '{}'),
-  scores: JSON.parse(localStorage.getItem('mh_scores') || '{}'),
-  clans: JSON.parse(localStorage.getItem('mh_clans') || '{}'),
-  attempts: JSON.parse(localStorage.getItem('mh_attempts') || '[]'),
-  save() {
-    localStorage.setItem('mh_users',    JSON.stringify(this.users));
-    localStorage.setItem('mh_scores',   JSON.stringify(this.scores));
-    localStorage.setItem('mh_clans',    JSON.stringify(this.clans));
-    localStorage.setItem('mh_attempts', JSON.stringify(this.attempts));
+
+  /* ── USERS ─────────────────────────────────────────────────────
+     Table schema:
+       username   TEXT PRIMARY KEY
+       pass       TEXT NOT NULL
+       clan       TEXT DEFAULT NULL      (clan code FK → clans.code)
+       totalScore INT  DEFAULT 0
+       bestLevel  INT  DEFAULT 0
+  ──────────────────────────────────────────────────────────────── */
+  async getUser(username) {
+    const { data, error } = await _sb
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .maybeSingle();
+    if (error) { console.error('[DB.getUser]', error.message); return null; }
+    return data; // null if not found
+  },
+
+  async createUser(username, pass) {
+    const { error } = await _sb
+      .from('users')
+      .insert({ username, pass, clan: null, totalScore: 0, bestLevel: 0 });
+    if (error) { console.error('[DB.createUser]', error.message); return false; }
+    return true;
+  },
+
+  async updateUser(username, fields) {
+    // fields: partial object e.g. { totalScore: 500, bestLevel: 3, clan: 'WRTH-1234' }
+    const { error } = await _sb
+      .from('users')
+      .update(fields)
+      .eq('username', username);
+    if (error) console.error('[DB.updateUser]', error.message);
+  },
+
+  /* ── SCORES ────────────────────────────────────────────────────
+     Table schema:
+       id         BIGSERIAL PRIMARY KEY
+       username   TEXT NOT NULL   (FK → users.username)
+       levelId    INT  NOT NULL
+       score      INT  NOT NULL
+       UNIQUE (username, levelId)
+  ──────────────────────────────────────────────────────────────── */
+  async getScores(username) {
+    // Returns { levelId: bestScore, ... }
+    const { data, error } = await _sb
+      .from('scores')
+      .select('levelId, score')
+      .eq('username', username);
+    if (error) { console.error('[DB.getScores]', error.message); return {}; }
+    const map = {};
+    (data || []).forEach(r => { map[r.levelId] = r.score; });
+    return map;
+  },
+
+  async upsertScore(username, levelId, score) {
+    // Only save if it's a new best
+    const { data: existing } = await _sb
+      .from('scores')
+      .select('score')
+      .eq('username', username)
+      .eq('levelId', levelId)
+      .maybeSingle();
+
+    if (existing && existing.score >= score) return; // not a new best
+
+    const { error } = await _sb
+      .from('scores')
+      .upsert(
+        { username, levelId, score },
+        { onConflict: 'username,levelId' }   // update on duplicate
+      );
+    if (error) console.error('[DB.upsertScore]', error.message);
+  },
+
+  async getTotalScore(username) {
+    const { data, error } = await _sb
+      .from('scores')
+      .select('score')
+      .eq('username', username);
+    if (error) { console.error('[DB.getTotalScore]', error.message); return 0; }
+    return (data || []).reduce((sum, r) => sum + r.score, 0);
+  },
+
+  /* ── ATTEMPTS ──────────────────────────────────────────────────
+     Table schema:
+       id            BIGSERIAL PRIMARY KEY
+       username      TEXT    NOT NULL
+       levelId       INT     NOT NULL
+       puzzleIndex   INT     NOT NULL
+       isCorrect     BOOLEAN NOT NULL
+       timeTaken     NUMERIC NOT NULL
+       attemptsCount INT     NOT NULL
+       ts            BIGINT  NOT NULL   (epoch ms)
+  ──────────────────────────────────────────────────────────────── */
+  async insertAttempt(username, levelId, puzzleIndex, isCorrect, timeTaken, attemptsCount) {
+    const { error } = await _sb
+      .from('attempts')
+      .insert({
+        username,
+        levelId,
+        puzzleIndex,
+        isCorrect,
+        timeTaken,
+        attemptsCount,
+        ts: Date.now()
+      });
+    if (error) console.error('[DB.insertAttempt]', error.message);
+  },
+
+  async getUserAttempts(username) {
+    const { data, error } = await _sb
+      .from('attempts')
+      .select('*')
+      .eq('username', username);
+    if (error) { console.error('[DB.getUserAttempts]', error.message); return []; }
+    return data || [];
+  },
+
+  /* ── CLANS ─────────────────────────────────────────────────────
+     Table schema:
+       code        TEXT PRIMARY KEY   (e.g. 'WRTH-1234')
+       name        TEXT NOT NULL
+       totalScore  INT  DEFAULT 0
+       members     TEXT[] DEFAULT '{}'   -- postgres array of usernames
+  ──────────────────────────────────────────────────────────────── */
+  async getClan(code) {
+    const { data, error } = await _sb
+      .from('clans')
+      .select('*')
+      .eq('code', code)
+      .maybeSingle();
+    if (error) { console.error('[DB.getClan]', error.message); return null; }
+    return data;
+  },
+
+  async getAllClans() {
+    const { data, error } = await _sb
+      .from('clans')
+      .select('*')
+      .order('totalScore', { ascending: false });
+    if (error) { console.error('[DB.getAllClans]', error.message); return []; }
+    return data || [];
+  },
+
+  async createClan(code, name, creatorUsername) {
+    const { error } = await _sb
+      .from('clans')
+      .insert({ code, name, totalScore: 0, members: [creatorUsername] });
+    if (error) { console.error('[DB.createClan]', error.message); return false; }
+    return true;
+  },
+
+  async addMemberToClan(code, username) {
+    // Fetch current members array, append, write back
+    const clan = await this.getClan(code);
+    if (!clan) return false;
+    if (clan.members.includes(username)) return true; // already in
+    const newMembers = [...clan.members, username];
+    const { error } = await _sb
+      .from('clans')
+      .update({ members: newMembers })
+      .eq('code', code);
+    if (error) { console.error('[DB.addMemberToClan]', error.message); return false; }
+    return true;
+  },
+
+  async removeMemberFromClan(code, username) {
+    const clan = await this.getClan(code);
+    if (!clan) return;
+    const newMembers = clan.members.filter(m => m !== username);
+    if (newMembers.length === 0) {
+      // Disband: delete the clan row
+      await _sb.from('clans').delete().eq('code', code);
+    } else {
+      await _sb.from('clans').update({ members: newMembers }).eq('code', code);
+    }
+  },
+
+  async recalcClanScore(code) {
+    const clan = await this.getClan(code);
+    if (!clan) return;
+    // Sum totalScore of each member from users table
+    const { data, error } = await _sb
+      .from('users')
+      .select('totalScore')
+      .in('username', clan.members);
+    if (error) { console.error('[DB.recalcClanScore]', error.message); return; }
+    const total = (data || []).reduce((s, r) => s + (r.totalScore || 0), 0);
+    await _sb.from('clans').update({ totalScore: total }).eq('code', code);
+  },
+
+  /* ── LEADERBOARD QUERIES ───────────────────────────────────────  */
+  async getGlobalLeaderboard() {
+    const { data, error } = await _sb
+      .from('users')
+      .select('username, totalScore, bestLevel, clan')
+      .order('totalScore', { ascending: false })
+      .limit(20);
+    if (error) { console.error('[DB.getGlobalLeaderboard]', error.message); return []; }
+    // Enrich with clanName
+    const clans = await this.getAllClans();
+    const clanMap = {};
+    clans.forEach(c => { clanMap[c.code] = c.name; });
+    return (data || []).map(u => ({
+      username:  u.username,
+      total:     u.totalScore || 0,
+      bestLevel: u.bestLevel  || 0,
+      clanName:  u.clan ? (clanMap[u.clan] || '—') : '—',
+      clanCode:  u.clan || null
+    }));
+  },
+
+  async getSpeedLeaderboard() {
+    // AVG time per correct attempt, per user
+    const { data, error } = await _sb
+      .from('attempts')
+      .select('username, timeTaken')
+      .eq('isCorrect', true);
+    if (error) { console.error('[DB.getSpeedLeaderboard]', error.message); return []; }
+    const totals = {};
+    const counts = {};
+    (data || []).forEach(r => {
+      totals[r.username] = (totals[r.username] || 0) + r.timeTaken;
+      counts[r.username] = (counts[r.username] || 0) + 1;
+    });
+    // Join with user info
+    const userRows = await this.getGlobalLeaderboard();
+    const userMap  = {};
+    userRows.forEach(u => { userMap[u.username] = u; });
+
+    return Object.keys(totals)
+      .map(u => ({
+        ...(userMap[u] || { username: u, total: 0, bestLevel: 0, clanName: '—' }),
+        avgSpeed: Math.round(totals[u] / counts[u])
+      }))
+      .sort((a, b) => a.avgSpeed - b.avgSpeed)
+      .slice(0, 15);
+  },
+
+  async getAccuracyLeaderboard() {
+    const { data, error } = await _sb
+      .from('attempts')
+      .select('username, isCorrect');
+    if (error) { console.error('[DB.getAccuracyLeaderboard]', error.message); return []; }
+    const correct = {};
+    const total   = {};
+    (data || []).forEach(r => {
+      total[r.username]   = (total[r.username]   || 0) + 1;
+      if (r.isCorrect) correct[r.username] = (correct[r.username] || 0) + 1;
+    });
+    const userRows = await this.getGlobalLeaderboard();
+    const userMap  = {};
+    userRows.forEach(u => { userMap[u.username] = u; });
+
+    return Object.keys(total)
+      .map(u => ({
+        ...(userMap[u] || { username: u, total: 0, bestLevel: 0, clanName: '—' }),
+        accuracy: Math.round(((correct[u] || 0) / total[u]) * 100)
+      }))
+      .sort((a, b) => b.accuracy - a.accuracy)
+      .slice(0, 15);
   }
 };
 
@@ -1032,6 +1297,7 @@ let timeLeft = 0;
 let currentAttempts = 0;
 let sessionStats = { correct: 0, wrong: 0, totalTime: 0, startTime: 0 };
 let currentLbTab = 'global';
+let currentUserData = null;
 
 /* ─────────────────────────────────────────────────────────────────
    LEVEL DEFINITIONS
@@ -1366,30 +1632,40 @@ function showLogin() {
   document.getElementById('panel-login').style.display    = 'block';
 }
 
-function register() {
+async function register() {
   const user = document.getElementById('reg-user').value.trim();
   const pass = document.getElementById('reg-pass').value.trim();
   if (!user || !pass) { toast('Fill in all fields', 'error'); return; }
-  if (DB.users[user]) { toast('Callsign already taken', 'error'); return; }
-  DB.users[user] = { pass, clan: null, totalScore: 0, bestLevel: 0 };
-  DB.scores[user] = {};
-  DB.save();
+  if (user.length < 3) { toast('Username must be 3+ characters', 'error'); return; }
+
+  const existing = await DB.getUser(user);
+  if (existing) { toast('Callsign already taken', 'error'); return; }
+
+  const ok = await DB.createUser(user, pass);
+  if (!ok) { toast('Registration failed — try again', 'error'); return; }
+
   toast('Agent created! Log in now.', 'success');
   showLogin();
 }
 
-function login() {
+async function login() {
   const user = document.getElementById('login-user').value.trim();
   const pass = document.getElementById('login-pass').value.trim();
   if (!user || !pass) { toast('Enter credentials', 'error'); return; }
-  if (!DB.users[user] || DB.users[user].pass !== pass) {
-    toast('Access denied — invalid credentials', 'error'); return;
+
+  const userData = await DB.getUser(user);
+  if (!userData || userData.pass !== pass) {
+    toast('Access denied — invalid credentials', 'error');
+    return;
   }
-  currentUser = user;
+
+  currentUser     = user;
+  currentUserData = userData; 
+
   updateStatusBar();
   document.getElementById('status-bar').classList.add('visible');
   document.getElementById('top-nav').classList.add('visible');
-  renderLevels();
+  await renderLevels();
   showScreen('screen-levels');
 }
 
@@ -1407,33 +1683,48 @@ function logout() {
    STATUS BAR
 ───────────────────────────────────────────────────────────────── */
 function updateStatusBar() {
-  if (!currentUser) return;
-  const u = DB.users[currentUser];
+  if (!currentUser || !currentUserData) return;
+  const u = currentUserData;
   document.getElementById('sb-user').textContent  = currentUser.toUpperCase();
-  document.getElementById('sb-score').textContent = u.totalScore || 0;
-  const clanId = u.clan;
-  const clanName = clanId && DB.clans[clanId] ? DB.clans[clanId].name : 'NONE';
-  document.getElementById('sb-clan').textContent  = clanName.toUpperCase();
+  document.getElementById('sb-score').textContent = (u.totalScore || 0).toLocaleString();
 
-  // Live clock
+  // clan name comes from cache set during login/clan ops
+  document.getElementById('sb-clan').textContent = (window._clanNameCache || 'NONE').toUpperCase();
+
   const now = new Date();
   document.getElementById('sb-time').textContent =
     `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
 }
 setInterval(updateStatusBar, 1000);
 
+// Helper: refreshes currentUserData from Supabase and updates UI
+async function refreshCurrentUser() {
+  if (!currentUser) return;
+  currentUserData = await DB.getUser(currentUser);
+  if (currentUserData?.clan) {
+    const clan = await DB.getClan(currentUserData.clan);
+    window._clanNameCache = clan ? clan.name : 'NONE';
+  } else {
+    window._clanNameCache = 'NONE';
+  }
+  updateStatusBar();
+}
+
 /* ─────────────────────────────────────────────────────────────────
    LEVEL GRID
 ───────────────────────────────────────────────────────────────── */
-function renderLevels() {
+async function renderLevels() {
   const grid = document.getElementById('levels-grid');
-  const user = DB.users[currentUser];
-  const userScores = DB.scores[currentUser] || {};
-  grid.innerHTML = '';
+  grid.innerHTML = '<div style="color:rgba(0,255,136,0.4);font-size:0.8rem;letter-spacing:0.1em">LOADING<span class="dots"></span></div>';
 
+  await refreshCurrentUser();
+  const user       = currentUserData;
+  const userScores = await DB.getScores(currentUser);
+
+  grid.innerHTML = '';
   LEVELS.forEach((lvl, i) => {
-    const unlocked = i === 0 || user.bestLevel >= i;
-    const best = userScores[lvl.id];
+    const unlocked = i === 0 || (user.bestLevel || 0) >= i;
+    const best     = userScores[lvl.id];
     const diffColors = { EASY:'#00ff88', MEDIUM:'#00e5ff', HARD:'#ffe600', EXPERT:'#ff3366', ELITE:'#ff00aa' };
     const col = diffColors[lvl.difficulty] || '#00ff88';
 
@@ -1445,7 +1736,7 @@ function renderLevels() {
       <div class="level-diff">
         <span class="tag" style="border-color:${col};color:${col}">${lvl.difficulty}</span>
       </div>
-      ${best ? `<div class="best-score">BEST: ${best}</div>` : ''}
+      ${best ? `<div class="best-score">BEST: ${best.toLocaleString()}</div>` : ''}
       ${!unlocked ? '<div style="font-size:0.65rem;color:rgba(255,51,102,0.7);margin-top:6px">🔒 LOCKED</div>' : ''}
     `;
     if (unlocked) card.onclick = () => startLevel(lvl.id);
@@ -1625,13 +1916,11 @@ function nextPuzzle(wasCorrect) {
 /* ─────────────────────────────────────────────────────────────────
    FINISH LEVEL
 ───────────────────────────────────────────────────────────────── */
-function finishLevel() {
+async function finishLevel() {
   clearTimer();
-  const total = puzzles.length;
+  const total    = puzzles.length;
   const accuracy = Math.round((sessionStats.correct / total) * 100);
-  const avgTime  = Math.round(sessionStats.totalTime / sessionStats.correct || 0);
 
-  // Grade
   let grade, gradeColor;
   if (accuracy === 100)    { grade = 'S — ELITE BREACH';   gradeColor = '#ffe600'; }
   else if (accuracy >= 80) { grade = 'A — CLEAN HACK';     gradeColor = '#00ff88'; }
@@ -1639,35 +1928,45 @@ function finishLevel() {
   else if (accuracy >= 40) { grade = 'C — COMPROMISED';    gradeColor = '#ff9900'; }
   else                     { grade = 'F — SYSTEM HELD';    gradeColor = '#ff3366'; }
 
-  // Save score
-  const user = DB.users[currentUser];
-  if (!DB.scores[currentUser]) DB.scores[currentUser] = {};
-  const prev = DB.scores[currentUser][currentLevel] || 0;
-  if (sessionScore > prev) DB.scores[currentUser][currentLevel] = sessionScore;
-  user.totalScore = Object.values(DB.scores[currentUser]).reduce((a,b) => a+b, 0);
-  if (currentLevel >= user.bestLevel) user.bestLevel = currentLevel;
-  DB.save();
-  renderLevels();
-  // Also update clan total
-  if (user.clan && DB.clans[user.clan]) {
-    recalcClanScore(user.clan);
+  // 1. Upsert the score (only saves if it's a new best)
+  await DB.upsertScore(currentUser, currentLevel, sessionScore);
+
+  // 2. Recalculate totalScore from all level scores
+  const newTotal = await DB.getTotalScore(currentUser);
+
+  // 3. Update bestLevel if this level is higher
+  const prevBest = currentUserData?.bestLevel || 0;
+  const newBest  = currentLevel >= prevBest ? currentLevel : prevBest;
+
+  await DB.updateUser(currentUser, {
+    totalScore: newTotal,
+    bestLevel:  newBest
+  });
+
+  // 4. Update clan score
+  await refreshCurrentUser();
+  if (currentUserData?.clan) {
+    await DB.recalcClanScore(currentUserData.clan);
   }
 
-  // Result screen
-  document.getElementById('result-score').textContent = sessionScore;
+  // 5. Fetch prev score for "NEW BEST?" display
+  const allScores = await DB.getScores(currentUser);
+  const prev = allScores[currentLevel] || 0;
+
+  document.getElementById('result-score').textContent = sessionScore.toLocaleString();
   document.getElementById('result-grade').textContent = grade;
   document.getElementById('result-grade').style.color = gradeColor;
-
   document.getElementById('result-stats').innerHTML = `
     <div class="stat-row"><span class="stat-label">LEVEL</span><span class="stat-value">${LEVELS[currentLevel-1].name}</span></div>
     <div class="stat-row"><span class="stat-label">PUZZLES</span><span class="stat-value">${sessionStats.correct}/${total} SOLVED</span></div>
     <div class="stat-row"><span class="stat-label">ACCURACY</span><span class="stat-value">${accuracy}%</span></div>
-    <div class="stat-row"><span class="stat-label">SESSION SCORE</span><span class="stat-value">${sessionScore} PTS</span></div>
-    <div class="stat-row"><span class="stat-label">TOTAL SCORE</span><span class="stat-value">${user.totalScore} PTS</span></div>
+    <div class="stat-row"><span class="stat-label">SESSION SCORE</span><span class="stat-value">${sessionScore.toLocaleString()} PTS</span></div>
+    <div class="stat-row"><span class="stat-label">TOTAL SCORE</span><span class="stat-value">${newTotal.toLocaleString()} PTS</span></div>
     <div class="stat-row"><span class="stat-label">NEW BEST?</span><span class="stat-value">${sessionScore > prev ? '✓ YES' : 'NO'}</span></div>
   `;
 
   updateStatusBar();
+  await renderLevels(); // re-renders grid with new unlock state
   showScreen('screen-result');
 }
 
@@ -1679,18 +1978,14 @@ function retryLevel() {
    ATTEMPTS LOG (simulates DB ATTEMPTS table)
 ───────────────────────────────────────────────────────────────── */
 function recordAttempt(isCorrect, timeTaken) {
-  DB.attempts.push({
-    user: currentUser,
-    level: currentLevel,
-    puzzle: puzzleIndex,
+  DB.insertAttempt(
+    currentUser,
+    currentLevel,
+    puzzleIndex,
     isCorrect,
     timeTaken,
-    attempts: currentAttempts + 1,
-    ts: Date.now()
-  });
-  // Cap at 500 entries
-  if (DB.attempts.length > 500) DB.attempts.splice(0, 100);
-  DB.save();
+    currentAttempts + 1
+  ).catch(e => console.error('[recordAttempt]', e));
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -1703,75 +1998,57 @@ function switchLbTab(tab, btn) {
   renderLeaderboard();
 }
 
-function renderLeaderboard() {
+async function renderLeaderboard() {
   const tbody = document.getElementById('lb-body');
-  tbody.innerHTML = '';
+  tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(0,255,136,0.3);padding:20px">FETCHING<span class="dots"></span></td></tr>';
 
   if (currentLbTab === 'clans') {
-    renderClanLeaderboard(tbody);
-    // Update header
     document.querySelector('#lb-table thead tr').innerHTML =
-      '<th>RANK</th><th>CLAN</th><th>TOTAL SCORE</th><th>MEMBERS</th><th>AVG SCORE</th>';
+      '<th>RANK</th><th>CLAN</th><th>TOTAL SCORE</th><th>MEMBERS</th><th>ACTION</th>';
+    await renderClanLeaderboard(tbody);
     return;
   }
 
   document.querySelector('#lb-table thead tr').innerHTML =
     '<th>RANK</th><th>AGENT</th><th>SCORE</th><th>LEVEL</th><th>CLAN</th>';
 
-  let entries = Object.keys(DB.users).map(u => {
-    const user = DB.users[u];
-    const scores = DB.scores[u] || {};
-    const total = Object.values(scores).reduce((a,b)=>a+b,0);
-    const clanId = user.clan;
-    const clanName = clanId && DB.clans[clanId] ? DB.clans[clanId].name : '—';
-
-    // For speed tab: average time per correct attempt
-    const userAttempts = DB.attempts.filter(a => a.user === u && a.isCorrect);
-    const avgSpeed = userAttempts.length
-      ? Math.round(userAttempts.reduce((s,a)=>s+a.timeTaken,0) / userAttempts.length)
-      : 999;
-
-    // Accuracy
-    const allAttempts = DB.attempts.filter(a => a.user === u);
-    const accuracy = allAttempts.length
-      ? Math.round(allAttempts.filter(a=>a.isCorrect).length / allAttempts.length * 100)
-      : 0;
-
-    return { username: u, total, bestLevel: user.bestLevel || 0, clanName, avgSpeed, accuracy };
-  });
-
+  let entries = [];
   if (currentLbTab === 'global') {
-    entries.sort((a,b) => b.total - a.total);
+    entries = await DB.getGlobalLeaderboard();
   } else if (currentLbTab === 'speed') {
-    entries.sort((a,b) => a.avgSpeed - b.avgSpeed);
+    entries = await DB.getSpeedLeaderboard();
     document.querySelector('#lb-table thead tr').innerHTML =
       '<th>RANK</th><th>AGENT</th><th>AVG TIME</th><th>LEVEL</th><th>CLAN</th>';
   } else if (currentLbTab === 'accuracy') {
-    entries.sort((a,b) => b.accuracy - a.accuracy);
+    entries = await DB.getAccuracyLeaderboard();
     document.querySelector('#lb-table thead tr').innerHTML =
       '<th>RANK</th><th>AGENT</th><th>ACCURACY</th><th>LEVEL</th><th>CLAN</th>';
   }
 
-  entries.slice(0, 15).forEach((e, i) => {
-    const rank = i + 1;
+  tbody.innerHTML = '';
+  entries.forEach((e, i) => {
+    const rank  = i + 1;
     const isYou = e.username === currentUser;
-    const tr = document.createElement('tr');
+    const tr    = document.createElement('tr');
     tr.className = (isYou ? 'you ' : '') + `rank-${rank}`;
 
     let thirdCol;
-    if (currentLbTab === 'speed')    thirdCol = `${e.avgSpeed}s avg`;
+    if (currentLbTab === 'speed')         thirdCol = `${e.avgSpeed}s avg`;
     else if (currentLbTab === 'accuracy') thirdCol = `${e.accuracy}%`;
-    else thirdCol = e.total.toLocaleString();
+    else                                  thirdCol = e.total.toLocaleString();
+
+    // Show JOIN button next to clan name when user has no clan
+    const userInClan = !!currentUserData?.clan;
+    const clanCell = e.clanName !== '—' && !userInClan && !isYou
+      ? `${e.clanName.toUpperCase()} <button class="join-btn" onclick="quickJoinClan('${e.clanCode}')">JOIN</button>`
+      : e.clanName.toUpperCase();
 
     tr.innerHTML = `
       <td>#${rank}</td>
       <td>${e.username.toUpperCase()}${isYou ? ' ★' : ''}</td>
       <td>${thirdCol}</td>
       <td>LVL ${e.bestLevel || 0}</td>
-      <td style="display:flex; align-items:center; gap:6px;">
-        ${e.clanName.toUpperCase()}
-        ${e.clanName !== '—' && !DB.users[currentUser].clan ? `<button class="join-btn" onclick="quickJoinClan('${e.clanName}')">JOIN</button>` : ''}
-      </td>
+      <td style="display:flex;align-items:center;gap:6px">${clanCell}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -1781,18 +2058,28 @@ function renderLeaderboard() {
   }
 }
 
-function renderClanLeaderboard(tbody) {
-  const clans = Object.values(DB.clans);
-  clans.sort((a,b) => (b.totalScore||0) - (a.totalScore||0));
+async function renderClanLeaderboard(tbody) {
+  const clans    = await DB.getAllClans();
+  const userInClan = !!currentUserData?.clan;
+
+  tbody.innerHTML = '';
   clans.slice(0, 10).forEach((c, i) => {
+    const avgScore  = c.members.length ? Math.round((c.totalScore||0) / c.members.length) : 0;
+    const isMember  = c.members.includes(currentUser);
     const tr = document.createElement('tr');
-    const avgScore = c.members.length ? Math.round((c.totalScore||0) / c.members.length) : 0;
     tr.innerHTML = `
       <td>#${i+1}</td>
       <td>${c.name.toUpperCase()}</td>
       <td>${(c.totalScore||0).toLocaleString()}</td>
       <td>${c.members.length}</td>
-      <td>${avgScore.toLocaleString()}</td>
+      <td>
+        ${isMember
+          ? '<span style="color:var(--cyan);font-size:0.75rem">★ MEMBER</span>'
+          : userInClan
+          ? '<span style="color:rgba(0,255,136,0.3);font-size:0.7rem">leave clan first</span>'
+          : `<button class="join-btn" onclick="quickJoinClan('${c.code}')">JOIN</button>`
+        }
+      </td>
     `;
     tbody.appendChild(tr);
   });
