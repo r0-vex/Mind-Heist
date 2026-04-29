@@ -689,6 +689,72 @@
       .panel { padding: 22px 18px; }
       #screen-levels .levels-grid { grid-template-columns: repeat(2, 1fr); }
     }
+    @media (max-width: 768px) {
+
+  /* 🔹 Reduce overall font size */
+  body {
+    font-size: 12px;
+  }
+
+  h1, h2 {
+    font-size: 1.4rem;
+  }
+
+  /* 🔹 TABLE FIX */
+  table {
+    width: 100%;
+    font-size: 10px;
+  }
+
+  th, td {
+    padding: 6px 4px;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  /* 🔹 CLAN + JOIN BUTTON FIX */
+  td {
+    max-width: 80px;
+  }
+
+  .join-btn {
+    display: block;
+    margin-top: 4px;
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  /* 🔹 LEVEL GRID FIX */
+  .levels-container {
+    display: grid;
+    grid-template-columns: 1fr; /* single column */
+    gap: 12px;
+  }
+
+  .level-card {
+    width: 100%;
+  }
+
+  /* 🔹 BUTTONS */
+  button {
+    font-size: 10px;
+    padding: 6px;
+  }
+
+  /* 🔹 HEADER FIX */
+  .top-bar {
+    flex-direction: column;
+    gap: 5px;
+    text-align: center;
+  }
+
+  /* 🔹 NAV BUTTONS */
+  .nav-buttons {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+}
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
@@ -711,9 +777,10 @@
 <!-- Top Navigation -->
 <div id="top-nav">
   <button class="nav-btn" onclick="showScreen('screen-levels')">LEVELS</button>
+  <button class="nav-btn" onclick="showScreen('screen-analytics'); renderAnalytics()">ANALYTICS</button>
   <button class="nav-btn" onclick="showScreen('screen-leaderboard'); renderLeaderboard()">BOARD</button>
   <button class="nav-btn" onclick="showScreen('screen-clan'); renderClan()">CLAN</button>
-  <button class="nav-btn btn-danger" onclick="logout()">EXIT</button>
+  <button class="nav-btn btn-danger" onclick="confirmExit()">EXIT</button>
 </div>
 
 <!-- Feedback Overlay -->
@@ -797,6 +864,23 @@
   </div>
 </div>
 
+<!--ANALYTICS-->
+
+<div class="screen" id="screen-analytics">
+  <div class="glitch" data-text="ANALYTICS">ANALYTICS</div>
+
+  <div class="panel mt-20" style="max-width:500px;width:100%">
+    <div class="corner-tl"></div>
+    <div class="corner-br"></div>
+
+    <div id="analytics-content" style="line-height:2;font-size:0.9rem">
+      Loading...
+    </div>
+  </div>
+
+  <button class="btn mt-20" onclick="showScreen('screen-levels')">← BACK</button>
+</div>
+
 <!-- ══════════════════════════════════════════════════════════════ -->
 <!--  SCREEN: PUZZLE                                              -->
 <!-- ══════════════════════════════════════════════════════════════ -->
@@ -820,6 +904,7 @@
     <div class="answer-area">
       <input class="hk-input" id="answer-input" type="text" placeholder="enter answer..." autocomplete="off"/>
       <button class="btn" onclick="submitAnswer()">HACK</button>
+      <button class="btn btn-cyan" onclick="showHint()">HINT</button>
     </div>
 
     <div class="attempts-row" id="attempts-dots"></div>
@@ -982,6 +1067,17 @@
   window.addEventListener('resize', resize);
   setInterval(draw, 50);
 })();
+
+/*Cache*/
+let clanCache = {};
+
+async function getClanCached(code) {
+  if (clanCache[code]) return clanCache[code];
+  const clan = await DB.getClan(code);
+  if (clan) clanCache[code] = clan;
+  return clan;
+}
+
 /* Password Viewer */
 function togglePassword() {
   const input = document.getElementById('login-pass');
@@ -1010,9 +1106,8 @@ function RegtogglePassword() {
 /* ─────────────────────────────────────────────────────────────────
    STATE
 ───────────────────────────────────────────────────────────────── */
-const SUPABASE_URL  = 'YOUR_SUPABASE_URL';       // e.g. https://abcxyz.supabase.co
-const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';  // public anon key
-
+const SUPABASE_URL  = 'YOUR_URL';
+const SUPABASE_ANON = 'YOUR_ANON_KEY'
 const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1021,16 +1116,7 @@ const _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
    All methods are async. UI callers are updated below.
 ════════════════════════════════════════════════════════════════════ */
 const DB = {
-
-  /* ── USERS ─────────────────────────────────────────────────────
-     Table schema:
-       username   TEXT PRIMARY KEY
-       pass       TEXT NOT NULL
-       clan       TEXT DEFAULT NULL      (clan code FK → clans.code)
-       totalScore INT  DEFAULT 0
-       bestLevel  INT  DEFAULT 0
-  ──────────────────────────────────────────────────────────────── */
-  async getUser(username) {
+    async getUser(username) {
     const { data, error } = await _sb
       .from('users')
       .select('*')
@@ -1041,62 +1127,19 @@ const DB = {
   },
 
   async createUser(username, pass) {
-    const { error } = await _sb
-      .from('users')
-      .insert({ username, pass, clan: null, totalScore: 0, bestLevel: 0 });
-    if (error) { console.error('[DB.createUser]', error.message); return false; }
-    return true;
-  },
-
+  const { error } = await _sb
+    .from('users')
+    .insert({ username, pass, clan: null, total_score: 0, best_level: 0 });
+  if (error) { console.error('[DB.createUser]', error.message); return false; }
+  return true;
+},
   async updateUser(username, fields) {
-    // fields: partial object e.g. { totalScore: 500, bestLevel: 3, clan: 'WRTH-1234' }
     const { error } = await _sb
       .from('users')
       .update(fields)
       .eq('username', username);
     if (error) console.error('[DB.updateUser]', error.message);
   },
-
-  /* ── SCORES ────────────────────────────────────────────────────
-     Table schema:
-       id         BIGSERIAL PRIMARY KEY
-       username   TEXT NOT NULL   (FK → users.username)
-       levelId    INT  NOT NULL
-       score      INT  NOT NULL
-       UNIQUE (username, levelId)
-  ──────────────────────────────────────────────────────────────── */
-  async getScores(username) {
-    // Returns { levelId: bestScore, ... }
-    const { data, error } = await _sb
-      .from('scores')
-      .select('levelId, score')
-      .eq('username', username);
-    if (error) { console.error('[DB.getScores]', error.message); return {}; }
-    const map = {};
-    (data || []).forEach(r => { map[r.levelId] = r.score; });
-    return map;
-  },
-
-  async upsertScore(username, levelId, score) {
-    // Only save if it's a new best
-    const { data: existing } = await _sb
-      .from('scores')
-      .select('score')
-      .eq('username', username)
-      .eq('levelId', levelId)
-      .maybeSingle();
-
-    if (existing && existing.score >= score) return; // not a new best
-
-    const { error } = await _sb
-      .from('scores')
-      .upsert(
-        { username, levelId, score },
-        { onConflict: 'username,levelId' }   // update on duplicate
-      );
-    if (error) console.error('[DB.upsertScore]', error.message);
-  },
-
   async getTotalScore(username) {
     const { data, error } = await _sb
       .from('scores')
@@ -1106,27 +1149,87 @@ const DB = {
     return (data || []).reduce((sum, r) => sum + r.score, 0);
   },
 
-  /* ── ATTEMPTS ──────────────────────────────────────────────────
-     Table schema:
-       id            BIGSERIAL PRIMARY KEY
-       username      TEXT    NOT NULL
-       levelId       INT     NOT NULL
-       puzzleIndex   INT     NOT NULL
-       isCorrect     BOOLEAN NOT NULL
-       timeTaken     NUMERIC NOT NULL
-       attemptsCount INT     NOT NULL
-       ts            BIGINT  NOT NULL   (epoch ms)
-  ──────────────────────────────────────────────────────────────── */
+  async getClan(code) {
+  const { data, error } = await _sb
+    .from('clans')
+    .select('*')
+    .eq('code', code)
+    .maybeSingle();
+  if (error) { console.error('[DB.getClan]', error.message); return null; }
+  return data;
+},
+
+async getAllClans() {
+  const { data, error } = await _sb
+    .from('clans')
+    .select('*')
+    .order('total_score', { ascending: false });
+  if (error) { console.error('[DB.getAllClans]', error.message); return []; }
+  return data || [];
+},
+
+async addMemberToClan(code, username) {
+  const clan = await this.getClan(code);
+  if (!clan) return false;
+  if (clan.members.includes(username)) return true;
+  const newMembers = [...clan.members, username];
+  const { error } = await _sb
+    .from('clans')
+    .update({ members: newMembers })
+    .eq('code', code);
+  if (error) { console.error('[DB.addMemberToClan]', error.message); return false; }
+  return true;
+},
+
+async removeMemberFromClan(code, username) {
+  const clan = await this.getClan(code);
+  if (!clan) return;
+  const newMembers = clan.members.filter(m => m !== username);
+  if (newMembers.length === 0) {
+    await _sb.from('clans').delete().eq('code', code);
+  } else {
+    await _sb.from('clans').update({ members: newMembers }).eq('code', code);
+  }
+},
+
+  async getScores(username) {
+    const { data, error } = await _sb
+      .from('scores')
+      .select('level_id, score')          // ← Changed
+      .eq('username', username);
+    if (error) { console.error('[DB.getScores]', error.message); return {}; }
+    const map = {};
+    (data || []).forEach(r => { map[r.level_id] = r.score; });  // ← Changed
+    return map;
+  },
+
+  async upsertScore(username, levelId, score) {
+    const { data: existing } = await _sb
+      .from('scores')
+      .select('score')
+      .eq('username', username)
+      .eq('level_id', levelId)             // ← Changed
+      .maybeSingle();
+    if (existing && existing.score >= score) return;
+    const { error } = await _sb
+      .from('scores')
+      .upsert(
+        { username, level_id: levelId, score },  // ← Changed
+        { onConflict: 'username,level_id' }      // ← Changed
+      );
+    if (error) console.error('[DB.upsertScore]', error.message);
+  },
+
   async insertAttempt(username, levelId, puzzleIndex, isCorrect, timeTaken, attemptsCount) {
     const { error } = await _sb
       .from('attempts')
       .insert({
         username,
-        levelId,
-        puzzleIndex,
-        isCorrect,
-        timeTaken,
-        attemptsCount,
+        level_id: levelId,           // ← Changed
+        puzzle_index: puzzleIndex,   // ← Changed
+        is_correct: isCorrect,       // ← Changed
+        time_taken: timeTaken,       // ← Changed
+        attempts_count: attemptsCount, // ← Changed
         ts: Date.now()
       });
     if (error) console.error('[DB.insertAttempt]', error.message);
@@ -1136,123 +1239,66 @@ const DB = {
     const { data, error } = await _sb
       .from('attempts')
       .select('*')
-      .eq('username', username);
+      .eq('username', username)
+      .order('ts', { ascending: true });
     if (error) { console.error('[DB.getUserAttempts]', error.message); return []; }
-    return data || [];
-  },
-
-  /* ── CLANS ─────────────────────────────────────────────────────
-     Table schema:
-       code        TEXT PRIMARY KEY   (e.g. 'WRTH-1234')
-       name        TEXT NOT NULL
-       totalScore  INT  DEFAULT 0
-       members     TEXT[] DEFAULT '{}'   -- postgres array of usernames
-  ──────────────────────────────────────────────────────────────── */
-  async getClan(code) {
-    const { data, error } = await _sb
-      .from('clans')
-      .select('*')
-      .eq('code', code)
-      .maybeSingle();
-    if (error) { console.error('[DB.getClan]', error.message); return null; }
-    return data;
-  },
-
-  async getAllClans() {
-    const { data, error } = await _sb
-      .from('clans')
-      .select('*')
-      .order('totalScore', { ascending: false });
-    if (error) { console.error('[DB.getAllClans]', error.message); return []; }
     return data || [];
   },
 
   async createClan(code, name, creatorUsername) {
     const { error } = await _sb
       .from('clans')
-      .insert({ code, name, totalScore: 0, members: [creatorUsername] });
+      .insert({ code, name, total_score: 0, members: [creatorUsername] });  // ← Changed
     if (error) { console.error('[DB.createClan]', error.message); return false; }
     return true;
-  },
-
-  async addMemberToClan(code, username) {
-    // Fetch current members array, append, write back
-    const clan = await this.getClan(code);
-    if (!clan) return false;
-    if (clan.members.includes(username)) return true; // already in
-    const newMembers = [...clan.members, username];
-    const { error } = await _sb
-      .from('clans')
-      .update({ members: newMembers })
-      .eq('code', code);
-    if (error) { console.error('[DB.addMemberToClan]', error.message); return false; }
-    return true;
-  },
-
-  async removeMemberFromClan(code, username) {
-    const clan = await this.getClan(code);
-    if (!clan) return;
-    const newMembers = clan.members.filter(m => m !== username);
-    if (newMembers.length === 0) {
-      // Disband: delete the clan row
-      await _sb.from('clans').delete().eq('code', code);
-    } else {
-      await _sb.from('clans').update({ members: newMembers }).eq('code', code);
-    }
   },
 
   async recalcClanScore(code) {
     const clan = await this.getClan(code);
     if (!clan) return;
-    // Sum totalScore of each member from users table
     const { data, error } = await _sb
       .from('users')
-      .select('totalScore')
+      .select('total_score')        // ← Changed
       .in('username', clan.members);
     if (error) { console.error('[DB.recalcClanScore]', error.message); return; }
-    const total = (data || []).reduce((s, r) => s + (r.totalScore || 0), 0);
-    await _sb.from('clans').update({ totalScore: total }).eq('code', code);
+    const total = (data || []).reduce((s, r) => s + (r.total_score || 0), 0);  // ← Changed
+    await _sb.from('clans').update({ total_score: total }).eq('code', code);  // ← Changed
   },
 
-  /* ── LEADERBOARD QUERIES ───────────────────────────────────────  */
   async getGlobalLeaderboard() {
     const { data, error } = await _sb
       .from('users')
-      .select('username, totalScore, bestLevel, clan')
-      .order('totalScore', { ascending: false })
+      .select('username, total_score, best_level, clan') 
+      .order('total_score', { ascending: false })   
       .limit(20);
     if (error) { console.error('[DB.getGlobalLeaderboard]', error.message); return []; }
-    // Enrich with clanName
     const clans = await this.getAllClans();
     const clanMap = {};
     clans.forEach(c => { clanMap[c.code] = c.name; });
     return (data || []).map(u => ({
       username:  u.username,
-      total:     u.totalScore || 0,
-      bestLevel: u.bestLevel  || 0,
+      total:     u.total_score || 0,      // ← Changed
+      bestLevel: Number(u.best_level) || 0,      // ← Changed
       clanName:  u.clan ? (clanMap[u.clan] || '—') : '—',
       clanCode:  u.clan || null
     }));
   },
 
   async getSpeedLeaderboard() {
-    // AVG time per correct attempt, per user
     const { data, error } = await _sb
       .from('attempts')
-      .select('username, timeTaken')
-      .eq('isCorrect', true);
+      .select('username, time_taken')      // ← Changed
+      .eq('is_correct', true);             // ← Changed
     if (error) { console.error('[DB.getSpeedLeaderboard]', error.message); return []; }
     const totals = {};
     const counts = {};
     (data || []).forEach(r => {
-      totals[r.username] = (totals[r.username] || 0) + r.timeTaken;
+      totals[r.username] = (totals[r.username] || 0) + r.time_taken;  // ← Changed
       counts[r.username] = (counts[r.username] || 0) + 1;
     });
-    // Join with user info
     const userRows = await this.getGlobalLeaderboard();
     const userMap  = {};
     userRows.forEach(u => { userMap[u.username] = u; });
-
     return Object.keys(totals)
       .map(u => ({
         ...(userMap[u] || { username: u, total: 0, bestLevel: 0, clanName: '—' }),
@@ -1265,18 +1311,17 @@ const DB = {
   async getAccuracyLeaderboard() {
     const { data, error } = await _sb
       .from('attempts')
-      .select('username, isCorrect');
+      .select('username, is_correct');     // ← Changed
     if (error) { console.error('[DB.getAccuracyLeaderboard]', error.message); return []; }
     const correct = {};
     const total   = {};
     (data || []).forEach(r => {
       total[r.username]   = (total[r.username]   || 0) + 1;
-      if (r.isCorrect) correct[r.username] = (correct[r.username] || 0) + 1;
+      if (r.is_correct) correct[r.username] = (correct[r.username] || 0) + 1;  // ← Changed
     });
     const userRows = await this.getGlobalLeaderboard();
     const userMap  = {};
     userRows.forEach(u => { userMap[u.username] = u; });
-
     return Object.keys(total)
       .map(u => ({
         ...(userMap[u] || { username: u, total: 0, bestLevel: 0, clanName: '—' }),
@@ -1658,7 +1703,7 @@ async function login() {
     toast('Access denied — invalid credentials', 'error');
     return;
   }
-
+  localStorage.setItem("mh_user", user);
   currentUser     = user;
   currentUserData = userData; 
 
@@ -1671,6 +1716,7 @@ async function login() {
 
 function logout() {
   currentUser = null;
+  localStorage.removeItem("mh_user");localStorage.removeItem("mh_user");
   clearTimer();
   document.getElementById('status-bar').classList.remove('visible');
   document.getElementById('top-nav').classList.remove('visible');
@@ -1686,7 +1732,7 @@ function updateStatusBar() {
   if (!currentUser || !currentUserData) return;
   const u = currentUserData;
   document.getElementById('sb-user').textContent  = currentUser.toUpperCase();
-  document.getElementById('sb-score').textContent = (u.totalScore || 0).toLocaleString();
+  document.getElementById('sb-score').textContent = (u.total_score || 0).toLocaleString();
 
   // clan name comes from cache set during login/clan ops
   document.getElementById('sb-clan').textContent = (window._clanNameCache || 'NONE').toUpperCase();
@@ -1723,7 +1769,8 @@ async function renderLevels() {
 
   grid.innerHTML = '';
   LEVELS.forEach((lvl, i) => {
-    const unlocked = i === 0 || (user.bestLevel || 0) >= i;
+    // FIX: Use best_level (from DB), not bestlevel
+    const unlocked = i === 0 || (user.best_level || 0) >= i;  // ← CHANGED
     const best     = userScores[lvl.id];
     const diffColors = { EASY:'#00ff88', MEDIUM:'#00e5ff', HARD:'#ffe600', EXPERT:'#ff3366', ELITE:'#ff00aa' };
     const col = diffColors[lvl.difficulty] || '#00ff88';
@@ -1931,17 +1978,17 @@ async function finishLevel() {
   // 1. Upsert the score (only saves if it's a new best)
   await DB.upsertScore(currentUser, currentLevel, sessionScore);
 
-  // 2. Recalculate totalScore from all level scores
+  // 2. Recalculate totalscore from all level scores
   const newTotal = await DB.getTotalScore(currentUser);
 
   // 3. Update bestLevel if this level is higher
-  const prevBest = currentUserData?.bestLevel || 0;
+  const prevBest = currentUserData?.best_level || 0;
   const newBest  = currentLevel >= prevBest ? currentLevel : prevBest;
 
   await DB.updateUser(currentUser, {
-    totalScore: newTotal,
-    bestLevel:  newBest
-  });
+    total_score: newTotal,
+    best_level:  newBest
+});
 
   // 4. Update clan score
   await refreshCurrentUser();
@@ -1988,6 +2035,42 @@ function recordAttempt(isCorrect, timeTaken) {
   ).catch(e => console.error('[recordAttempt]', e));
 }
 
+/*Analytics */
+async function renderAnalytics() {
+  await refreshCurrentUser(); // ensure latest data
+
+  const attempts = await DB.getUserAttempts(currentUser);
+  const recent = attempts.slice(-10); // last 10 attempts
+
+const trend = recent.map(a => 
+  a.is_correct 
+    ? '<span style="color:#00ff88;text-shadow:0 0 6px #00ff88">🟢</span>' 
+    : '<span style="color:#ff3366;text-shadow:0 0 6px #ff3366">🔴</span>'
+).join(' ');
+  const total = attempts.length;
+  const correct = attempts.filter(a => a.is_correct).length;
+
+  const accuracy = total 
+    ? Math.round((correct / total) * 100) 
+    : 0;
+
+  const avgTime = total 
+    ? Math.round(attempts.reduce((s,a)=>s + Number(a.time_taken), 0) / total) 
+    : 0;
+
+  document.getElementById("analytics-content").innerHTML = `
+    <div>Total Games: ${total}</div>
+    <div>Accuracy: ${accuracy}%</div>
+    <div>Avg Time: ${avgTime}s</div>
+    <div>Best Level: ${currentUserData.best_level || 0}</div>
+    <div>Total Score: ${(currentUserData.total_score || 0).toLocaleString()}</div>
+
+    <div style="margin-top:15px">
+    Recent Performance:<br>
+    ${trend || 'No recent data'}
+  </div>
+  `;
+}
 /* ─────────────────────────────────────────────────────────────────
    LEADERBOARD
 ───────────────────────────────────────────────────────────────── */
@@ -2059,18 +2142,19 @@ async function renderLeaderboard() {
 }
 
 async function renderClanLeaderboard(tbody) {
+  await DB.recalcClanScore(currentUserData.clan);
   const clans    = await DB.getAllClans();
   const userInClan = !!currentUserData?.clan;
 
   tbody.innerHTML = '';
   clans.slice(0, 10).forEach((c, i) => {
-    const avgScore  = c.members.length ? Math.round((c.totalScore||0) / c.members.length) : 0;
+    const avgScore  = c.members.length ? Math.round((c.total_score||0) / c.members.length) : 0;
     const isMember  = c.members.includes(currentUser);
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>#${i+1}</td>
       <td>${c.name.toUpperCase()}</td>
-      <td>${(c.totalScore||0).toLocaleString()}</td>
+      <td>${(c.total_score||0).toLocaleString()}</td>
       <td>${c.members.length}</td>
       <td>
         ${isMember
@@ -2096,119 +2180,126 @@ function generateClanCode(name) {
   return name.replace(/\s+/g, '').substring(0,5).toUpperCase() + '-' + suffix;
 }
 
-function createClan() {
+async function createClan() {
   const name = document.getElementById('clan-name-input').value.trim();
   if (!name) { toast('Enter a clan name', 'error'); return; }
-  const user = DB.users[currentUser];
-  if (user.clan) { toast('Already in a clan — leave first', 'error'); return; }
+
+  await refreshCurrentUser();
+  if (currentUserData?.clan) { toast('Already in a clan — leave first', 'error'); return; }
 
   const code = generateClanCode(name);
-  const clan = { id: code, name, code, members: [currentUser], totalScore: 0 };
-  DB.clans[code] = clan;
-  user.clan = code;
-  recalcClanScore(code);
-  DB.save();
+  const ok   = await DB.createClan(code, name, currentUser);
+  if (!ok) { toast('Failed to create clan', 'error'); return; }
+
+  await DB.updateUser(currentUser, { clan: code });
+  await DB.recalcClanScore(code);
+  await refreshCurrentUser();
+
   toast(`Clan "${name}" created! Code: ${code}`, 'success');
-  renderClan();
+  await renderClan();
+  alert(`Your clan code is: ${code}\nShare this with teammates!`);
 }
 
-function joinClan() {
+async function joinClan() {
   const code = document.getElementById('clan-code-input').value.trim().toUpperCase();
   if (!code) { toast('Enter a clan code', 'error'); return; }
-  const clan = DB.clans[code];
-  if (!clan) { toast('Clan not found — check the code', 'error'); return; }
-  const user = DB.users[currentUser];
-  if (user.clan) { toast('Already in a clan — leave first', 'error'); return; }
-  if (clan.members.includes(currentUser)) { toast('Already a member', 'error'); return; }
-
-  clan.members.push(currentUser);
-  user.clan = code;
-  recalcClanScore(code);
-  DB.save();
-  toast(`Joined clan "${clan.name}"!`, 'success');
-  renderClan();
+  await _joinByClanCode(code);
 }
 
-function quickJoinClan(clanName) {
-  const clan = Object.values(DB.clans).find(c => c.name === clanName);
+async function quickJoinClan(clanCode) {
+  await _joinByClanCode(clanCode);
+}
 
-  if (!clan) {
-    toast('Clan not found', 'error');
-    return;
-  }
+// shared internal join logic
+async function _joinByClanCode(code) {
+  await refreshCurrentUser();
+  if (currentUserData?.clan) { toast('Leave your current clan first', 'error'); return; }
 
-  const user = DB.users[currentUser];
+  const clan = await DB.getClan(code);
+  if (!clan) { toast('Clan not found — check the code', 'error'); return; }
+  if (clan.members.includes(currentUser)) { toast('Already a member', 'error'); return; }
 
-  if (user.clan) {
-    toast('Leave current clan first', 'error');
-    return;
-  }
+  const ok = await DB.addMemberToClan(code, currentUser);
+  if (!ok) { toast('Failed to join clan', 'error'); return; }
 
-  clan.members.push(currentUser);
-  user.clan = clan.code;
+  await DB.updateUser(currentUser, { clan: code });
+  await DB.recalcClanScore(code);
+  await refreshCurrentUser();
 
-  recalcClanScore(clan.code);
-  DB.save();
-
-  toast(`Joined ${clan.name}`, 'success');
-  renderClan();
+  toast(`Joined clan "${clan.name}"!`, 'success');
+  await renderClan();
   updateStatusBar();
 }
 
-function leaveClan() {
-  const user = DB.users[currentUser];
-  if (!user.clan) return;
-  const clan = DB.clans[user.clan];
+async function leaveClan() {
+  await refreshCurrentUser();
+  if (!currentUserData?.clan) return;
+
+  const code = currentUserData.clan;
+  const clan = await DB.getClan(code);
+
+  await DB.removeMemberFromClan(code, currentUser); // handles disband if last member
+  await DB.updateUser(currentUser, { clan: null });
+
   if (clan) {
-    clan.members = clan.members.filter(m => m !== currentUser);
-    recalcClanScore(user.clan);
-    if (clan.members.length === 0) {
-      delete DB.clans[user.clan]; // Disband empty clan
+    if (clan.members.filter(m => m !== currentUser).length === 0) {
       toast('Clan disbanded (no members left)', 'error');
     } else {
+      await DB.recalcClanScore(code);
       toast(`Left clan "${clan.name}"`, 'error');
     }
   }
-  user.clan = null;
-  DB.save();
-  renderClan();
+
+  await refreshCurrentUser();
+  await renderClan();
   updateStatusBar();
 }
 
-function recalcClanScore(clanId) {
-  const clan = DB.clans[clanId];
-  if (!clan) return;
-  clan.totalScore = clan.members.reduce((sum, m) => sum + (DB.users[m]?.totalScore || 0), 0);
-  DB.save();
-}
-
-function renderClan() {
-  const user = DB.users[currentUser];
+async function renderClan() {
+  await refreshCurrentUser();
   const clanView   = document.getElementById('clan-view');
   const clanNoView = document.getElementById('clan-join-create');
 
-  if (user.clan && DB.clans[user.clan]) {
-    const clan = DB.clans[user.clan];
+  if (currentUserData?.clan) {
+    const clan = await DB.getClan(currentUserData.clan);
+    if (!clan) {
+      clanView.style.display   = 'none';
+      clanNoView.style.display = 'block';
+      return;
+    }
+
     clanView.style.display   = 'block';
     clanNoView.style.display = 'none';
-
+    await DB.recalcClanScore(currentUserData.clan);
     document.getElementById('my-clan-name').textContent    = clan.name.toUpperCase();
     document.getElementById('my-clan-code').textContent    = clan.code;
-    document.getElementById('my-clan-members').textContent = clan.members.length;
-    document.getElementById('my-clan-score').textContent   = (clan.totalScore||0).toLocaleString();
+    document.getElementById('my-clan-code').onclick = function() {
+      navigator.clipboard.writeText(clan.code);
+      toast('Code copied!', 'success');
+    };
+    document.getElementById('my-clan-code').style.cursor = 'pointer';
+    document.getElementById('my-clan-code').title = 'Click to copy';
 
-    // Rank
-    const clansSorted = Object.values(DB.clans).sort((a,b)=>(b.totalScore||0)-(a.totalScore||0));
-    const rank = clansSorted.findIndex(c => c.code === clan.code) + 1;
+    document.getElementById('my-clan-members').textContent = clan.members.length;
+    document.getElementById('my-clan-score').textContent   = (clan.total_score||0).toLocaleString();
+
+    // Rank among all clans
+    const allClans = await DB.getAllClans();
+    const rank = allClans.findIndex(c => c.code === clan.code) + 1;
     document.getElementById('my-clan-rank').textContent = `#${rank}`;
 
-    // Members list
+    // Member list with scores
+    const batchUsers = await getBatchUsers(clan.members);
+    const userMap = {};
+    batchUsers.forEach(u => { userMap[u.username] = u.total_score; });
+    
     const membersList = document.getElementById('clan-members-list');
     membersList.innerHTML = '';
-    const membersSorted = clan.members
-      .map(m => ({ name: m, score: DB.users[m]?.totalScore || 0 }))
-      .sort((a,b) => b.score - a.score);
-    membersSorted.forEach(m => {
+    const memberData = clan.members
+      .map(m => ({ name: m, score: userMap[m] || 0 }))
+      .sort((a, b) => b.score - a.score);
+    
+    memberData.forEach(m => {
       const div = document.createElement('div');
       div.className = 'clan-member-row';
       div.innerHTML = `
@@ -2223,6 +2314,16 @@ function renderClan() {
   }
 }
 
+// Helper: batch get users (from earlier)
+async function getBatchUsers(usernames) {
+  if (!usernames.length) return [];
+  const { data, error } = await _sb
+    .from('users')
+    .select('username, total_score')
+    .in('username', usernames);
+  if (error) { console.error('[getBatchUsers]', error.message); return []; }
+  return data || [];
+}
 /* ─────────────────────────────────────────────────────────────────
    FEEDBACK OVERLAY
 ───────────────────────────────────────────────────────────────── */
@@ -2234,7 +2335,6 @@ function showFeedback(text, isCorrect) {
   overlay.classList.add('show');
   setTimeout(() => overlay.classList.remove('show'), 700);
 }
-
 /* ─────────────────────────────────────────────────────────────────
    TOAST
 ───────────────────────────────────────────────────────────────── */
@@ -2247,38 +2347,52 @@ function toast(msg, type = 'success') {
   toastTimeout = setTimeout(() => el.classList.remove('show'), 2800);
 }
 
-/* ─────────────────────────────────────────────────────────────────
-   SEED DEMO DATA (for impressive leaderboard on first run)
-───────────────────────────────────────────────────────────────── */
-(function seedDemoData() {
-  const demoUsers = [
-    { u:'GH0ST_R00T', s:{ 1:820,2:750,3:610 }, lvl:3, clan:'WRAITH' },
-    { u:'0x_CIPHER',  s:{ 1:900,2:880,3:760,4:530 }, lvl:4, clan:'WRAITH' },
-    { u:'VOIDHAX',    s:{ 1:780,2:700 }, lvl:2, clan:'SHADOW' },
-    { u:'KRYPT0N',    s:{ 1:850,2:810,3:790,4:650,5:400 }, lvl:5, clan:null },
-    { u:'DARKPULSE',  s:{ 1:700,2:680,3:590 }, lvl:3, clan:'SHADOW' },
-    { u:'SYN_FL00D',  s:{ 1:920,2:890,3:840,4:720,5:560,6:310 }, lvl:6, clan:'WRAITH' },
-  ];
-  const clanData = {
-    'WRAITH': { name:'Wraith Protocol', members:['GH0ST_R00T','0x_CIPHER','SYN_FL00D'] },
-    'SHADOW': { name:'Shadow Nexus', members:['VOIDHAX','DARKPULSE'] },
-  };
+/*HINT SYSTEM*/
+function showHint() {
+  const p = puzzles[puzzleIndex];
 
-  demoUsers.forEach(d => {
-    if (!DB.users[d.u]) {
-      DB.users[d.u] = { pass:'demo', clan: d.clan, totalScore: Object.values(d.s).reduce((a,b)=>a+b,0), bestLevel: d.lvl };
-      DB.scores[d.u] = d.s;
+  let hint = '';
+
+  if (p.type === 'SEQUENCE') {
+    hint = 'Look at the difference between numbers 👀';
+  }
+  else if (p.type === 'MATH') {
+    hint = 'Break it step by step 🧠';
+  }
+  else if (p.type === 'LOGIC') {
+    hint = 'Think in binary/encoding patterns ⚡';
+  }
+  else if (p.type === 'STRING') {
+    hint = 'Focus on character transformation 🔐';
+  }
+  else {
+    hint = 'Pattern is hiding in plain sight 👁';
+  }
+
+  toast(hint, 'success');
+  //penalty
+  sessionScore -= 20;
+}
+window.addEventListener("load", async () => {
+  const savedUser = localStorage.getItem("mh_user");
+  if (savedUser) {
+    currentUser = savedUser;
+    currentUserData = await DB.getUser(savedUser);
+
+    if (currentUserData) {
+      document.getElementById('status-bar').classList.add('visible');
+      document.getElementById('top-nav').classList.add('visible');
+
+      await renderLevels();
+      showScreen('screen-levels');
     }
-  });
-  Object.keys(clanData).forEach(code => {
-    if (!DB.clans[code]) {
-      const c = clanData[code];
-      const total = c.members.reduce((s,m) => s + (DB.users[m]?.totalScore||0), 0);
-      DB.clans[code] = { id:code, name:c.name, code, members:c.members, totalScore:total };
-    }
-  });
-  DB.save();
-})();
+  }
+});
+function confirmExit() {
+  if (confirm("Are you sure you want to exit?")) {
+    logout();
+  }
+}
 </script>
 </body>
 </html>
