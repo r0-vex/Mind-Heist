@@ -175,7 +175,7 @@ It combines **logic, design, and data** to create an engaging and scalable syste
 
 ## 👨‍💻 Author
 
-**Rohith**
+**Rohith** and
 **Diksha**
 
 ---
