@@ -1,0 +1,164 @@
+/* ────────────────────────────────────────────────────────────────
+   MIND HEIST — Animations, Keyframes, Transitions, Hover Effects
+   ──────────────────────────────────────────────────────────────── */
+
+/* ─── GLITCH ANIMATIONS ─────────────────────────────────────── */
+@keyframes glitch-flicker {
+  0%,90%,100% { opacity:1; }
+  92% { opacity:0.8; transform: skewX(-1deg); }
+  94% { opacity:1; }
+  96% { opacity:0.6; }
+}
+@keyframes glitch-shift-1 {
+  0%,100% { transform: translateX(0); }
+  33% { transform: translateX(-4px); }
+  66% { transform: translateX(4px); }
+}
+@keyframes glitch-shift-2 {
+  0%,100% { transform: translateX(0); }
+  33% { transform: translateX(4px); }
+  66% { transform: translateX(-4px); }
+}
+
+.glitch {
+  animation: glitch-flicker 4s infinite;
+}
+.glitch::before {
+  animation: glitch-shift-1 3s infinite;
+}
+.glitch::after {
+  animation: glitch-shift-2 3s infinite;
+}
+
+/* ─── SCAN LINE ANIMATION ──────────────────────────────────── */
+@keyframes scan-line {
+  0% { transform: scaleX(0); transform-origin: left; }
+  50% { transform: scaleX(1); }
+  100% { transform: scaleX(0); transform-origin: right; }
+}
+.panel::before {
+  animation: scan-line 3s linear infinite;
+}
+
+/* ─── SCREEN TRANSITIONS ────────────────────────────────────── */
+.screen {
+  transition: opacity 0.4s ease;
+}
+
+/* ─── INPUT FOCUS ───────────────────────────────────────────── */
+.hk-input {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.hk-input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 12px rgba(0,255,136,0.2);
+}
+
+/* ─── BUTTON TRANSITIONS ───────────────────────────────────── */
+.btn {
+  transition: color 0.2s, box-shadow 0.2s;
+}
+.btn::before {
+  transition: transform 0.25s ease;
+}
+.btn:hover::before { transform: translateX(0); }
+.btn:hover { color: var(--bg); box-shadow: 0 0 20px rgba(0,255,136,0.5); }
+.btn:active { transform: scale(0.97); }
+
+.btn-danger:hover { color: #fff; }
+.btn-cyan:hover { color: var(--bg); }
+
+.join-btn {
+  transition: all 0.2s ease;
+}
+.join-btn:hover {
+  background: var(--cyan);
+  color: var(--bg);
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+/* ─── LOGIN BOOT TEXT ───────────────────────────────────────── */
+@keyframes blink { 50% { opacity: 0; } }
+#screen-login .boot-text {
+  animation: blink 1.2s step-end infinite;
+}
+
+.link-btn:hover { color: var(--green); }
+
+/* ─── LEVEL CARD TRANSITIONS ────────────────────────────────── */
+.level-card {
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+}
+.level-card:hover {
+  border-color: var(--green);
+  box-shadow: 0 0 20px rgba(0,255,136,0.15);
+  transform: translateY(-2px);
+}
+.level-card.locked:hover { transform: none; box-shadow: none; border-color: var(--border); }
+
+/* ─── TIMER PULSE ───────────────────────────────────────────── */
+@keyframes pulse-timer { 50% { opacity: 0.5; } }
+#timer-display.danger { animation: pulse-timer 0.5s infinite; }
+
+/* ─── SEQUENCE ITEM PULSE ─────────────────────────────────── */
+@keyframes pulse-box {
+  0%,100% { box-shadow: none; }
+  50% { box-shadow: 0 0 12px rgba(255,230,0,0.3); }
+}
+.seq-item.unknown { animation: pulse-box 1s ease infinite; }
+
+/* ─── ANSWER INPUT ANIMATIONS ─────────────────────────────── */
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  40%{transform:translateX(8px)}
+  60%{transform:translateX(-5px)}
+  80%{transform:translateX(5px)}
+}
+#answer-input.shake { animation: shake 0.4s ease; }
+
+/* ─── PROGRESS BAR ──────────────────────────────────────────── */
+#progress-bar { transition: width 0.4s ease; }
+
+/* ─── FEEDBACK OVERLAY ──────────────────────────────────────── */
+#feedback-overlay { transition: opacity 0.2s; }
+#feedback-overlay.show { opacity: 1; }
+
+@keyframes feedback-pop {
+  0%   { transform: scale(0.5); opacity: 0; }
+  40%  { transform: scale(1.15); opacity: 1; }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 0; }
+}
+.feedback-text { animation: feedback-pop 0.6s ease forwards; }
+
+/* ─── TOAST TRANSITIONS ─────────────────────────────────────── */
+#toast { transition: opacity 0.3s; }
+#toast.show { opacity: 1; }
+
+/* ─── NAV BUTTON TRANSITIONS ────────────────────────────────── */
+.nav-btn {
+  transition: color 0.2s, border-color 0.2s;
+}
+.nav-btn:hover { color: var(--green); border-color: var(--green); }
+
+/* ─── LEADERBOARD TAB TRANSITIONS ──────────────────────────── */
+.lb-tab {
+  transition: background 0.2s, color 0.2s;
+}
+.lb-tab:hover:not(.active) { background: rgba(0,255,136,0.05); color: rgba(0,255,136,0.8); }
+
+/* ─── LEADERBOARD ROW TRANSITIONS ──────────────────────────── */
+.lb-table tbody tr { transition: background 0.15s; }
+.lb-table tbody tr:hover { background: rgba(0,255,136,0.04); }
+
+/* ─── LOADING DOTS ─────────────────────────────────────────── */
+@keyframes dots {
+  0%   { content: '.'; }
+  33%  { content: '..'; }
+  66%  { content: '...'; }
+  100% { content: ''; }
+}
+.dots::after {
+  animation: dots 1.2s steps(3) infinite;
+}

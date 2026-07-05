@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Ignore Supabase config
+js/config.js
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log

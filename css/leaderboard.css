@@ -1,0 +1,24 @@
+/* ────────────────────────────────────────────────────────────────
+   MIND HEIST — Leaderboard Specific Styles
+   ──────────────────────────────────────────────────────────────── */
+
+/* Leaderboard tab buttons are in style.css; active/hover transitions in animations.css */
+
+/* Leaderboard table cell alignment for action buttons */
+.clan-action-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Clan member badge in leaderboard */
+.clan-member-badge {
+  color: var(--cyan);
+  font-size: 0.75rem;
+}
+
+/* Clan locked message in leaderboard */
+.clan-locked-msg {
+  color: rgba(0,255,136,0.3);
+  font-size: 0.7rem;
+}

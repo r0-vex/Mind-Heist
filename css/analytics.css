@@ -1,0 +1,17 @@
+/* ────────────────────────────────────────────────────────────────
+   MIND HEIST — Analytics Dashboard Styles
+   ──────────────────────────────────────────────────────────────── */
+
+#screen-analytics .panel {
+  max-width: 500px;
+  width: 100%;
+}
+
+#analytics-content {
+  line-height: 2;
+  font-size: 0.9rem;
+}
+
+.analytics-trend {
+  margin-top: 15px;
+}

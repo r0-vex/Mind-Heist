@@ -1,181 +1,360 @@
+![HTML](https://img.shields.io/badge/HTML-5-orange)
+![CSS](https://img.shields.io/badge/CSS-3-blue)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green)
+![License](https://img.shields.io/badge/License-MIT-lightgrey)
+
 # 🧠 Mind Heist
 
 ### A Hacker-Themed Puzzle Game with DBMS Integration
 
-> “Not just solving puzzles… you're cracking the system.”
+> *"Not just solving puzzles... you're cracking the system."*
 
 ---
 
 ## 🚀 Project Overview
 
-**Mind Heist** is a hacker-style puzzle game designed to test logical thinking, pattern recognition, and problem-solving skills.
-Unlike traditional games, it integrates **real database concepts** using Supabase to store and analyze user performance.
+**Mind Heist** is a hacker-themed puzzle game built using **HTML, CSS, JavaScript, and Supabase (PostgreSQL)**. The game challenges players with progressively difficult logical, mathematical, binary, hexadecimal, and cipher-based puzzles while demonstrating the practical implementation of **Database Management System (DBMS)** concepts.
 
-This project demonstrates how **DBMS concepts + frontend systems** can be combined to build an interactive, data-driven application.
-
----
-
-## 🎮 Features
-
-* 🧩 **Dynamic Puzzle Engine**
-
-  * Generates puzzles based on difficulty
-  * Includes sequences, logic, binary, cipher-based questions
-
-* 🧠 **User Progress Tracking**
-
-  * Tracks score, level progression, and attempts
-  * Stores all data in a relational database
-
-* 🏆 **Leaderboard System**
-
-  * Global leaderboard (top players)
-  * Clan-based leaderboard
-
-* 🏴‍☠️ **Clan System**
-
-  * Create and join clans
-  * Track total clan performance
-
-* 📊 **Analytics Dashboard**
-
-  * Accuracy %
-  * Average solving time
-  * Total games played
-  * Recent performance trend (🟢 / 🔴)
-
-* 🔐 **Authentication System**
-
-  * Login / Register
-  * Session persistence (auto-login)
-
-* 🎨 **Hacker-Themed UI**
-
-  * Matrix-style visuals
-  * Neon cyber interface
+Unlike a traditional puzzle game, Mind Heist persists user progress, scores, analytics, and clan information in a relational database, making it a complete data-driven web application.
 
 ---
 
-## 🛠️ Tech Stack
+## 🌐 Live Demo
 
-* **Frontend:** HTML, CSS, JavaScript
-* **Backend (BaaS):** Supabase (PostgreSQL)
-* **Database Concepts Used:**
+Coming Soon (Vercel)
 
-  * Tables & Relationships
-  * Primary & Foreign Keys
-  * Aggregation
-  * Data normalization
-  * Query-based analytics
+# ✨ Features
 
----
+## 🎮 Gameplay
 
-## 🗄️ Database Schema
-
-### Users
-
-* `username` (PK)
-* `pass`
-* `clan`
-* `total_score`
-* `best_level`
-
-### Scores
-
-* `id` (PK)
-* `username` (FK)
-* `level_id`
-* `score`
-
-### Attempts
-
-* `id` (PK)
-* `username` (FK)
-* `level_id`
-* `puzzle_index`
-* `is_correct`
-* `time_taken`
-* `attempts_count`
-* `ts` (timestamp)
-
-### Clans
-
-* `code` (PK)
-* `name`
-* `total_score`
-* `members`
+- 🧩 9 progressively harder levels (Boot Sector → Dark Nexus)
+- 🔢 Dynamic puzzle generation
+- ⏱️ Countdown timer with visual warnings
+- 💡 Hint system
+- ⭐ Score calculation based on correctness and speed
+- 🔓 Automatic level unlocking
 
 ---
 
-## ⚙️ Setup Instructions
+## 📊 Analytics
 
-1. Clone the repository:
+- Accuracy percentage
+- Average solving time
+- Total games played
+- Best level reached
+- Total score
+- Recent performance trend
+
+---
+
+## 🏆 Leaderboards
+
+- 🌍 Global Leaderboard
+- ⚡ Fastest Players Leaderboard
+- 🎯 Accuracy Leaderboard
+- 🏴 Clan Leaderboard
+
+---
+
+## 🏴 Clan System
+
+- Create clans
+- Join existing clans
+- Leave clans
+- View clan members
+- Automatic clan score calculation
+
+---
+
+## 👤 User System
+
+- Register
+- Login
+- Auto-login using browser storage
+- Session persistence
+- Logout confirmation dialog
+
+---
+
+## 🎨 User Interface
+
+- Matrix rain animation
+- Cyberpunk hacker theme
+- Neon UI
+- Responsive layout
+- Toast notifications
+- Smooth screen transitions
+- Glitch text effects
+
+---
+
+# 🛠 Tech Stack
+
+| Technology | Purpose |
+|------------|---------|
+| HTML5 | Structure |
+| CSS3 | Styling & Animations |
+| JavaScript (ES6) | Game Logic |
+| Supabase | Backend-as-a-Service |
+| PostgreSQL | Relational Database |
+| Git & GitHub | Version Control |
+| Vercel | Deployment |
+
+---
+
+# 📂 Project Structure
+
+```text
+Mind-Heist/
+│
+├── index.html
+│
+├── css/
+│   ├── style.css
+│   ├── animations.css
+│   ├── leaderboard.css
+│   ├── analytics.css
+│   └── responsive.css
+│
+├── js/
+│   ├── config.js          # Local configuration (ignored)
+│   ├── db.js              # Database layer
+│   ├── puzzles.js         # Puzzle engine
+│   ├── ui.js              # UI management
+│   ├── auth.js            # Authentication
+│   ├── game.js            # Gameplay logic
+│   ├── leaderboard.js     # Leaderboards
+│   ├── analytics.js       # Analytics dashboard
+│   ├── clans.js           # Clan management
+│   └── app.js             # Application entry point
+│
+├── assets/
+│
+├── screenshots/
+│
+├── config.example.js
+├── README.md
+└── .gitignore
+```
+
+---
+
+# 🗄 Database Schema
+
+## Users
+
+| Column | Description |
+|---------|-------------|
+| username (PK) | Unique username |
+| pass | User password |
+| clan | Clan code |
+| total_score | Overall score |
+| best_level | Highest unlocked level |
+
+---
+
+## Scores
+
+| Column | Description |
+|---------|-------------|
+| id (PK) | Score ID |
+| username (FK) | User |
+| level_id | Level |
+| score | Level score |
+
+---
+
+## Attempts
+
+| Column | Description |
+|---------|-------------|
+| id (PK) | Attempt ID |
+| username (FK) | User |
+| level_id | Level |
+| puzzle_index | Puzzle number |
+| is_correct | Correct / Incorrect |
+| time_taken | Time taken |
+| attempts_count | Number of tries |
+| ts | Timestamp |
+
+---
+
+## Clans
+
+| Column | Description |
+|---------|-------------|
+| code (PK) | Clan code |
+| name | Clan name |
+| total_score | Combined clan score |
+| members | Member usernames |
+
+---
+
+# 🧠 DBMS Concepts Demonstrated
+
+The project demonstrates several practical database concepts including:
+
+- Relational Database Design
+- Normalization
+- Primary Keys
+- Foreign Keys
+- CRUD Operations
+- Aggregation (SUM, AVG, COUNT)
+- Sorting (ORDER BY)
+- Conflict Resolution (UPSERT)
+- Query-based Analytics
+- One-to-Many Relationships
+- Indexing
+- Real-time Data Persistence
+
+---
+
+# ⚙️ Setup Instructions
+
+## 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/mind-heist.git
+git clone https://github.com/r0-vex/Mind-Heist.git
 ```
 
-2. Create a `config.js` file:
+---
 
-```js
-export const SUPABASE_URL = "YOUR_SUPABASE_URL";
-export const SUPABASE_ANON = "YOUR_SUPABASE_ANON_KEY";
+## 2. Navigate to the Project
+
+```bash
+cd Mind-Heist
 ```
 
-3. Open `index.html` in browser
+---
+
+## 3. Create `js/config.js`
+
+```javascript
+const CONFIG = {
+    SUPABASE_URL: "YOUR_SUPABASE_URL",
+    SUPABASE_ANON_KEY: "YOUR_SUPABASE_ANON_KEY"
+};
+```
 
 ---
 
-## 📸 Screenshots
+## 4. Configure Supabase
 
-> <img width="1365" height="640" alt="image" src="https://github.com/user-attachments/assets/ef1c2e4e-aca1-4fa5-93db-eb08c0b16729" />
-<img width="1365" height="641" alt="image" src="https://github.com/user-attachments/assets/96745b76-a7b9-4daa-83c2-aaef2b9c200e" />
-<img width="1365" height="636" alt="image" src="https://github.com/user-attachments/assets/706cbe8d-f6fc-4c67-88c7-71f9967e27c7" />
-<img width="1365" height="642" alt="image" src="https://github.com/user-attachments/assets/56316519-53d1-48ba-bd32-a8643b98396f" />
+Create the following tables:
 
+- users
+- scores
+- attempts
+- clans
 
-
----
-
-## 🧠 Key Concepts Demonstrated
-
-* Real-time data handling using Supabase
-* Relational database design
-* Data aggregation and analytics
-* Frontend + DB integration
-* User-based performance tracking
+The schema is available in the project documentation.
 
 ---
 
-## 🔐 Security Note
+## 5. Run the Project
 
-This project uses the **Supabase anon public key** for frontend access.
-For simplicity, **Row Level Security (RLS) is disabled**.
+Simply open
 
-> In production systems, proper authentication and access control policies would be implemented.
+```text
+index.html
+```
 
----
-
-## 🚧 Future Enhancements
-
-* 📊 Advanced analytics (weak topics, speed per category)
-* 📈 Graph-based performance tracking
-* 🧠 AI-based difficulty adjustment
-* 🌐 Multiplayer puzzle battles
-* 🔒 Secure authentication with RLS
+or use **VS Code Live Server**.
 
 ---
 
-## 🏁 Conclusion
+# 📸 Screenshots
 
-Mind Heist showcases how database systems can go beyond storage and become the backbone of an intelligent application.
-It combines **logic, design, and data** to create an engaging and scalable system.
+### 🔐 Login
+<p align="center">
+  <img src="screenshots/login.png" width="900">
+</p>
+
+### 🎮 Level Selection
+<p align="center">
+  <img src="screenshots/levels.png" width="900">
+</p>
+
+### 🧩 Gameplay
+<p align="center">
+  <img src="screenshots/gameplay.png" width="900">
+</p>
+
+### 🏆 Leaderboard
+<p align="center">
+  <img src="screenshots/leaderboard.png" width="900">
+</p>
+
+### 📊 Analytics Dashboard
+<p align="center">
+  <img src="screenshots/analytics.png" width="900">
+</p>
+
+### 🏴 Clan Leaderboard
+<p align="center">
+  <img src="screenshots/clans.png" width="900">
+</p>
+
+### 👥 Clan Management
+<p align="center">
+  <img src="screenshots/clan_system.png" width="900">
+</p>
+
+# 🔐 Security
+
+This project uses the **Supabase Anon Public Key**, which is intended for client-side applications.
+
+Database access should be protected using **Row Level Security (RLS)** in production deployments.
+
+For educational purposes, this project may use simplified database permissions.
 
 ---
 
-## 👨‍💻 Author
+# 🚀 Future Enhancements
 
-**Rohith** and
+- 📈 Performance graphs
+- 📊 Puzzle category statistics
+- 🧠 AI-generated puzzles
+- 🎮 Multiplayer battles
+- 🏅 Achievement badges
+- 🌍 Global events
+- 🔒 Full Supabase Authentication
+- 🛡 Row Level Security (RLS)
+- 📱 Progressive Web App (PWA)
+- 🌐 Multiplayer clan wars
+
+---
+
+# 📚 Learning Outcomes
+
+Through this project we implemented:
+
+- Frontend development using HTML, CSS and JavaScript
+- Backend integration using Supabase
+- Relational database management
+- SQL queries and aggregation
+- CRUD operations
+- User authentication
+- Data visualization
+- Modular JavaScript architecture
+- Responsive web design
+- Git and GitHub workflow
+
+---
+
+# 👨‍💻 Authors
+
+**Rohith**
+
 **Diksha**
 
 ---
+
+# 📄 License
+
+This project is licensed under the **MIT License**.
+
+---
+
+⭐ If you found this project interesting, consider giving it a **Star** on GitHub!
