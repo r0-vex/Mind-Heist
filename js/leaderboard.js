@@ -33,8 +33,11 @@ async function renderLeaderboard() {
     '<th>RANK</th><th>AGENT</th><th>SCORE</th><th>LEVEL</th><th>CLAN</th>';
 
   let entries = [];
-  if (currentLbTab === 'global') {
-    entries = await DB.getGlobalLeaderboard();
+  let currentRank = null;
+  if (currentLbTab === "global") {
+    const result = await DB.getGlobalLeaderboard(currentUser);
+    entries = result.topPlayers;
+    currentRank = result.currentUser;
   } else if (currentLbTab === 'speed') {
     entries = await DB.getSpeedLeaderboard();
     document.querySelector('#lb-table thead tr').innerHTML =
@@ -75,6 +78,33 @@ async function renderLeaderboard() {
   if (!entries.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(0,255,136,0.3);padding:20px">NO DATA YET</td></tr>';
   }
+  const oldCard = document.getElementById("your-rank-card");
+if (oldCard) oldCard.remove();
+
+if (currentLbTab === "global" && currentRank) {
+
+    const card = document.createElement("div");
+
+    card.id = "your-rank-card";
+
+    card.innerHTML = `
+        <div class="your-rank-title">YOUR RANK</div>
+
+        <div class="your-rank-row">
+
+            <span>#${currentRank.rank}</span>
+
+            <span>${currentRank.username.toUpperCase()}</span>
+
+            <span>${currentRank.total.toLocaleString()}</span>
+
+            <span>LVL ${currentRank.bestLevel}</span>
+
+        </div>
+    `;
+
+    document.getElementById("lb-table").after(card);
+}
 }
 
 async function renderClanLeaderboard(tbody) {

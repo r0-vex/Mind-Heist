@@ -173,24 +173,64 @@ const DB = {
     await _sb.from('clans').update({ total_score: total }).eq('code', code);
   },
 
-  async getGlobalLeaderboard() {
+  async getAllUsersOrdered() {
+
     const { data, error } = await _sb
-      .from('users')
-      .select('username, total_score, best_level, clan')
-      .order('total_score', { ascending: false })
-      .limit(20);
-    if (error) { console.error('[DB.getGlobalLeaderboard]', error.message); return []; }
+        .from("users")
+        .select("username,total_score,best_level,clan")
+        .order("total_score", { ascending:false });
+
+    if(error){
+        console.error(error);
+        return [];
+    }
+
     const clans = await this.getAllClans();
+
     const clanMap = {};
-    clans.forEach(c => { clanMap[c.code] = c.name; });
-    return (data || []).map(u => ({
-      username:  u.username,
-      total:     u.total_score || 0,
-      bestLevel: Number(u.best_level) || 0,
-      clanName:  u.clan ? (clanMap[u.clan] || '—') : '—',
-      clanCode:  u.clan || null
+
+    clans.forEach(c=>{
+        clanMap[c.code]=c.name;
+    });
+
+    return data.map(u=>({
+
+        username:u.username,
+
+        total:u.total_score||0,
+
+        bestLevel:Number(u.best_level)||0,
+
+        clanName:u.clan
+            ? clanMap[u.clan] || "—"
+            : "—",
+
+        clanCode:u.clan
+
     }));
-  },
+
+},
+
+async getGlobalLeaderboard(username) {
+
+    const players = await this.getAllUsersOrdered();
+
+    const currentIndex = players.findIndex(
+        p => p.username === username
+    );
+
+    return {
+        topPlayers: players.slice(0,5),
+
+        currentUser:
+            currentIndex >= 0
+                ? {
+                    ...players[currentIndex],
+                    rank: currentIndex + 1
+                  }
+                : null
+    };
+},
 
   async getSpeedLeaderboard() {
     const { data, error } = await _sb
@@ -204,7 +244,7 @@ const DB = {
       totals[r.username] = (totals[r.username] || 0) + r.time_taken;
       counts[r.username] = (counts[r.username] || 0) + 1;
     });
-    const userRows = await this.getGlobalLeaderboard();
+    const userRows = await this.getAllUsersOrdered();
     const userMap  = {};
     userRows.forEach(u => { userMap[u.username] = u; });
     return Object.keys(totals)
@@ -213,7 +253,7 @@ const DB = {
         avgSpeed: Math.round(totals[u] / counts[u])
       }))
       .sort((a, b) => a.avgSpeed - b.avgSpeed)
-      .slice(0, 15);
+      .slice(0, 5);
   },
 
   async getAccuracyLeaderboard() {
@@ -227,7 +267,7 @@ const DB = {
       total[r.username]   = (total[r.username]   || 0) + 1;
       if (r.is_correct) correct[r.username] = (correct[r.username] || 0) + 1;
     });
-    const userRows = await this.getGlobalLeaderboard();
+    const userRows = await this.getAllUsersOrdered();
     const userMap  = {};
     userRows.forEach(u => { userMap[u.username] = u; });
     return Object.keys(total)
@@ -236,7 +276,7 @@ const DB = {
         accuracy: Math.round(((correct[u] || 0) / total[u]) * 100)
       }))
       .sort((a, b) => b.accuracy - a.accuracy)
-      .slice(0, 15);
+      .slice(0, 5);
   }
 };
 
