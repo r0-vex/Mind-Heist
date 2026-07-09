@@ -1,6 +1,11 @@
 /* ────────────────────────────────────────────────────────────────
    MIND HEIST — Analytics Dashboard
    User statistics, accuracy, average time, recent performance.
+
+   MIGRATION CHANGES:
+   - DB.getUserAttempts(userId) now takes UUID instead of username.
+   - currentUser is UUID; currentUserData.username used for display.
+   - All analytics logic unchanged; only the DB call parameter changed.
    ──────────────────────────────────────────────────────────────── */
 
 async function renderAnalytics() {

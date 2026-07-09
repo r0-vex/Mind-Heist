@@ -1,15 +1,12 @@
 const fs = require("fs");
 
-const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_ANON_KEY;
-
 const config = `
-window.CONFIG = {
-    SUPABASE_URL: "${url}",
-    SUPABASE_ANON_KEY: "${key}"
+const CONFIG = {
+    SUPABASE_URL: "${process.env.SUPABASE_URL}",
+    SUPABASE_ANON_KEY: "${process.env.SUPABASE_ANON_KEY}"
 };
 `;
 
-fs.writeFileSync("config.js", config);
+fs.writeFileSync("js/config.js", config);
 
-console.log("config.js generated.");
+console.log("Generated js/config.js");

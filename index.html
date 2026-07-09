@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MIND HEIST — Neural Breach Protocol</title>
   <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <meta name="description" content="Mind Heist is a hacker-themed puzzle game built using HTML, CSS, JavaScript and Supabase featuring secure authentication, leaderboards and analytics.">
+  <meta property="og:title" content="Mind Heist">
+  <meta property="og:description" content="A hacker-themed puzzle game.">
+  <meta property="og:image" content="assets/cover.png">
+  <meta name="twitter:image" content="assets/cover.png">
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="css/style.css" />
@@ -61,8 +66,8 @@
     <div class="corner-tl"></div>
     <div class="corner-br"></div>
     <div class="input-group">
-      <label>Agent ID (Username)</label>
-      <input class="hk-input" id="login-user" type="text" placeholder="enter callsign..." maxlength="20" autocomplete="off" />
+      <label>Email Address</label>
+      <input class="hk-input" id="login-email" type="email" placeholder="agent@email.com" autocomplete="email"/>
     </div>
     <div class="input-group">
       <label>Access Code (Password)</label>
@@ -85,6 +90,10 @@
     <div class="input-group">
       <label>Choose Callsign</label>
       <input class="hk-input" id="reg-user" type="text" placeholder="unique username..." maxlength="20" autocomplete="off"/>
+      <div class="input-group">
+        <label>Email Address</label>
+        <input class="hk-input" id="reg-email" type="email" placeholder="agent@email.com" autocomplete="email"/>
+        </div>
     </div>
     <div class="input-group">
       <label>Set Access Code</label>

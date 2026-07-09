@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<title>404 | Mind Heist</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=VT323&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --green:   #00ff88;
+  --cyan:    #00e5ff;
+  --red:     #ff3366;
+  --yellow:  #ffe600;
+  --dim:     #003320;
+  --bg:      #010d07;
+  --panel:   rgba(0,255,136,0.04);
+  --border:  rgba(0,255,136,0.18);
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--green);
+  font-family: 'Share Tech Mono', monospace;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.box {
+  text-align: center;
+  max-width: 700px;
+}
+
+h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 80px;
+  margin-bottom: 15px;
+  text-shadow: 0 0 18px #00ff66;
+  color: var(--green);
+}
+
+p {
+  font-size: 18px;
+  color: var(--cyan);
+}
+
+.cursor {
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0; }
+}
+
+/* ─── EXACT .btn FROM style.css + animations.css ───────────────── */
+.btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 12px 28px;
+  border: 1px solid var(--green);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--green);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: color 0.2s, box-shadow 0.2s;
+  margin-top: 40px;
+}
+
+.btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--green);
+  transform: translateX(-100%);
+  transition: transform 0.25s ease;
+  z-index: -1;
+}
+
+.btn:hover::before {
+  transform: translateX(0);
+}
+
+.btn:hover {
+  color: var(--bg);
+  box-shadow: 0 0 20px rgba(0,255,136,0.5);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+</style>
+
+<base target="_blank">
+</head>
+
+<body>
+
+<div class="box">
+  <h1>404</h1>
+  <p>ACCESS DENIED</p>
+  <p>TARGET NODE NOT FOUND<span class="cursor">_</span></p>
+  <p>The requested system does not exist.</p>
+  <button class="btn" onclick="location.href='/'">
+    RETURN TO HQ
+  </button>
+</div>
+
+</body>
+</html>

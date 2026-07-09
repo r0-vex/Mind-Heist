@@ -1,6 +1,13 @@
 /* ────────────────────────────────────────────────────────────────
    MIND HEIST — Leaderboard System
    Global, speed, accuracy, and clan leaderboards.
+
+   MIGRATION CHANGES:
+   - DB.getGlobalLeaderboard(userId) now takes UUID for current user rank lookup.
+   - isYou comparison uses userId (UUID) instead of username string.
+   - All leaderboard entries still display usernames (from profile lookups).
+   - Clan leaderboard: isMember checks UUID against clan.members (UUID array).
+   - No UI changes; only internal comparison logic updated.
    ──────────────────────────────────────────────────────────────── */
 
 let currentLbTab = 'global';
@@ -51,7 +58,8 @@ async function renderLeaderboard() {
   tbody.innerHTML = '';
   entries.forEach((e, i) => {
     const rank  = i + 1;
-    const isYou = e.username === currentUser;
+    /* Compare by UUID (userId) instead of username */
+    const isYou = e.userId === currentUser;
     const tr    = document.createElement('tr');
     tr.className = (isYou ? 'you ' : '') + `rank-${rank}`;
 
@@ -78,44 +86,34 @@ async function renderLeaderboard() {
   if (!entries.length) {
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:rgba(0,255,136,0.3);padding:20px">NO DATA YET</td></tr>';
   }
+
+  /* Current user rank card (global tab only) */
   const oldCard = document.getElementById("your-rank-card");
-if (oldCard) oldCard.remove();
+  if (oldCard) oldCard.remove();
 
-if (currentLbTab === "global" && currentRank) {
-
+  if (currentLbTab === "global" && currentRank) {
     const card = document.createElement("div");
-
     card.id = "your-rank-card";
-
     card.innerHTML = `
-        <div class="your-rank-title">YOUR RANK</div>
-
-        <div class="your-rank-row">
-
-            <span>#${currentRank.rank}</span>
-
-            <span>${currentRank.username.toUpperCase()}</span>
-
-            <span>${currentRank.total.toLocaleString()}</span>
-
-            <span>LVL ${currentRank.bestLevel}</span>
-
-        </div>
+      <div class="your-rank-title">YOUR RANK</div>
+      <div class="your-rank-row">
+        <span>#${currentRank.rank}</span>
+        <span>${currentRank.username.toUpperCase()}</span>
+        <span>${currentRank.total.toLocaleString()}</span>
+        <span>LVL ${currentRank.bestLevel}</span>
+      </div>
     `;
-
     document.getElementById("lb-table").after(card);
-}
+  }
 }
 
 async function renderClanLeaderboard(tbody) {
-  if (currentUserData?.clan) {
-    await DB.recalcClanScore(currentUserData.clan);
-  }
   const clans    = await DB.getAllClans();
   const userInClan = !!currentUserData?.clan;
 
   tbody.innerHTML = '';
   clans.slice(0, 10).forEach((c, i) => {
+    /* Clan members now stores UUIDs; check against currentUser (UUID) */
     const isMember  = c.members.includes(currentUser);
     const tr = document.createElement('tr');
     tr.innerHTML = `

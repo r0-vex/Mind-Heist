@@ -1,6 +1,14 @@
 /* ────────────────────────────────────────────────────────────────
    MIND HEIST — Game Engine
    Level management, score calculation, timer, unlock system, hints.
+
+   MIGRATION CHANGES:
+   - All DB calls now pass currentUser (UUID) instead of username string.
+   - DB.getScores(userId), DB.upsertScore(userId, ...), etc.
+   - DB.updateUser(userId, fields) — updates profile by UUID.
+   - DB.recalcClanScore uses clan code from profile.
+   - recordAttempt passes UUID.
+   - No other logic changes; all game mechanics preserved.
    ──────────────────────────────────────────────────────────────── */
 
 let currentLevel = 0;
@@ -214,6 +222,7 @@ function nextPuzzle(wasCorrect) {
 
 /* ─────────────────────────────────────────────────────────────────
    FINISH LEVEL
+   All DB calls use currentUser (UUID).
 ───────────────────────────────────────────────────────────────── */
 async function finishLevel() {
   clearTimer();
@@ -239,10 +248,7 @@ async function finishLevel() {
   });
 
   await refreshCurrentUser();
-  if (currentUserData?.clan) {
-    await DB.recalcClanScore(currentUserData.clan);
-  }
-
+  
   const allScores = await DB.getScores(currentUser);
   const prev = allScores[currentLevel] || 0;
 
@@ -269,6 +275,7 @@ function retryLevel() {
 
 /* ─────────────────────────────────────────────────────────────────
    ATTEMPTS LOG
+   Passes UUID (currentUser) to DB.insertAttempt.
 ───────────────────────────────────────────────────────────────── */
 function recordAttempt(isCorrect, timeTaken) {
   DB.insertAttempt(

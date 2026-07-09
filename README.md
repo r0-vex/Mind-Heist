@@ -6,8 +6,7 @@
 
 # 🧠 Mind Heist
 
-### A Hacker-Themed Puzzle Game with DBMS Integration
-
+### A Full-Stack Hacker-Themed Puzzle Game with Real-Time Analytics & DBMS Integration
 > *"Not just solving puzzles... you're cracking the system."*
 
 ---
@@ -69,11 +68,11 @@ Coming Soon (Vercel)
 
 ## 👤 User System
 
-- Register
-- Login
-- Auto-login using browser storage
-- Session persistence
-- Logout confirmation dialog
+- Secure registration using Supabase Authentication
+- Email & password login
+- JWT-based session persistence
+- Automatic session restoration
+- Secure logout
 
 ---
 
@@ -144,50 +143,54 @@ Mind-Heist/
 
 ## Users
 
-| Column | Description |
-|---------|-------------|
-| username (PK) | Unique username |
-| pass | User password |
-| clan | Clan code |
-| total_score | Overall score |
-| best_level | Highest unlocked level |
+| Column        | Description            |
+| ------------- | ---------------------- |
+| id (UUID, PK) | Linked to auth.users   |
+| username      | Display name           |
+| clan          | Clan code              |
+| total_score   | Overall score          |
+| best_level    | Highest unlocked level |
+| created_at    | Account creation time  |
+
 
 ---
 
 ## Scores
 
-| Column | Description |
-|---------|-------------|
-| id (PK) | Score ID |
-| username (FK) | User |
-| level_id | Level |
-| score | Level score |
+| Column            | Description |
+| ----------------- | ----------- |
+| id                | Score row   |
+| user_id (UUID FK) | Player      |
+| level_id          | Level       |
+| score             | Best score  |
 
 ---
 
 ## Attempts
 
-| Column | Description |
-|---------|-------------|
-| id (PK) | Attempt ID |
-| username (FK) | User |
-| level_id | Level |
-| puzzle_index | Puzzle number |
-| is_correct | Correct / Incorrect |
-| time_taken | Time taken |
-| attempts_count | Number of tries |
-| ts | Timestamp |
+| Column            | Description       |
+| ----------------- | ----------------- |
+| id                | Attempt           |
+| user_id (UUID FK) | Player            |
+| level_id          | Level             |
+| puzzle_index      | Puzzle            |
+| is_correct        | Correct/Incorrect |
+| time_taken        | Seconds           |
+| attempts_count    | Attempts          |
+| created_at        | Timestamp         |
+
 
 ---
 
 ## Clans
 
-| Column | Description |
-|---------|-------------|
-| code (PK) | Clan code |
-| name | Clan name |
-| total_score | Combined clan score |
-| members | Member usernames |
+| Column      | Description       |
+| ----------- | ----------------- |
+| code        | Clan code         |
+| name        | Clan name         |
+| total_score | Cached clan score |
+| members     | UUID[]            |
+
 
 ---
 
@@ -205,8 +208,11 @@ The project demonstrates several practical database concepts including:
 - Conflict Resolution (UPSERT)
 - Query-based Analytics
 - One-to-Many Relationships
-- Indexing
 - Real-time Data Persistence
+- Row Level Security (RLS)
+- Authentication using Supabase Auth
+- UUID-based relational design
+- Database indexing
 
 ---
 
@@ -303,26 +309,34 @@ or use **VS Code Live Server**.
 
 # 🔐 Security
 
-This project uses the **Supabase Anon Public Key**, which is intended for client-side applications.
+Mind Heist v2 introduces production-oriented security improvements:
 
-Database access should be protected using **Row Level Security (RLS)** in production deployments.
-
-For educational purposes, this project may use simplified database permissions.
+- Supabase Authentication
+- JWT-based session management
+- Row Level Security (RLS)
+- UUID-based user identities
+- No plaintext password storage
+- Client-safe public anon key
+- Database access restricted by policies
 
 ---
 
 # 🚀 Future Enhancements
 
-- 📈 Performance graphs
-- 📊 Puzzle category statistics
-- 🧠 AI-generated puzzles
-- 🎮 Multiplayer battles
-- 🏅 Achievement badges
-- 🌍 Global events
-- 🔒 Full Supabase Authentication
-- 🛡 Row Level Security (RLS)
-- 📱 Progressive Web App (PWA)
-- 🌐 Multiplayer clan wars
+- Performance graphs
+- Puzzle category statistics
+- AI-generated puzzles
+- Multiplayer battles
+- Achievement badges
+- Global events
+- Progressive Web App (PWA)
+- Multiplayer clan wars
+- Realtime leaderboards
+- Achievements
+- Daily challenges
+- Clan chat
+- RPC-based clan synchronization
+- PWA support
 
 ---
 

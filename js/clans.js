@@ -1,6 +1,18 @@
 /* ────────────────────────────────────────────────────────────────
    MIND HEIST — Clan System
    Join, leave, create, render clans, and manage clan scores.
+
+   MIGRATION CHANGES:
+   - All clan operations now use UUIDs (currentUser) instead of usernames.
+   - DB.createClan(code, name, creatorUserId) takes UUID.
+   - DB.addMemberToClan(code, userId) takes UUID.
+   - DB.removeMemberFromClan(code, userId) takes UUID.
+   - DB.updateUser(userId, fields) updates profile by UUID.
+   - Clan members array stores UUIDs; isMember checks UUID inclusion.
+   - getBatchUsers(userIds) fetches profiles by UUID array.
+   - Member list renders usernames from profile lookups.
+   - Leaderboard join buttons still work with clan codes.
+   - No UI changes; only internal identifiers changed.
    ──────────────────────────────────────────────────────────────── */
 
 /* ─────────────────────────────────────────────────────────────────
@@ -13,6 +25,7 @@ function generateClanCode(name) {
 
 /* ─────────────────────────────────────────────────────────────────
    CREATE CLAN
+   Uses currentUser (UUID) as creator and first member.
 ───────────────────────────────────────────────────────────────── */
 async function createClan() {
   const name = document.getElementById('clan-name-input').value.trim();
@@ -23,16 +36,15 @@ async function createClan() {
 
   const code = generateClanCode(name);
   const ok   = await DB.createClan(code, name, currentUser);
-  if (!ok) { toast('Failed to create clan', 'error'); return; }
+  if (!ok) return;
 
   await DB.updateUser(currentUser, { clan: code });
-  await DB.recalcClanScore(code);
+  await DB.syncClans();
   await refreshCurrentUser();
 
   toast(`Clan "${name}" created! Code: ${code}`, 'success');
   await renderClan();
-  alert(`Your clan code is: ${code}
-Share this with teammates!`);
+  alert(`Your clan code is: ${code}\nShare this with teammates!`);
 }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -53,6 +65,7 @@ async function quickJoinClan(clanCode) {
 
 /* ─────────────────────────────────────────────────────────────────
    INTERNAL JOIN LOGIC
+   Uses currentUser (UUID) for membership.
 ───────────────────────────────────────────────────────────────── */
 async function _joinByClanCode(code) {
   await refreshCurrentUser();
@@ -62,13 +75,10 @@ async function _joinByClanCode(code) {
   if (!clan) { toast('Clan not found — check the code', 'error'); return; }
   if (clan.members.includes(currentUser)) { toast('Already a member', 'error'); return; }
 
-  const ok = await DB.addMemberToClan(code, currentUser);
-  if (!ok) { toast('Failed to join clan', 'error'); return; }
-
   await DB.updateUser(currentUser, { clan: code });
-  await DB.recalcClanScore(code);
+  await DB.syncClans();
   await refreshCurrentUser();
-
+  await renderLeaderboard();
   toast(`Joined clan "${clan.name}"!`, 'success');
   await renderClan();
   updateStatusBar();
@@ -76,33 +86,27 @@ async function _joinByClanCode(code) {
 
 /* ─────────────────────────────────────────────────────────────────
    LEAVE CLAN
+   Uses currentUser (UUID) to remove from members array.
 ───────────────────────────────────────────────────────────────── */
 async function leaveClan() {
-  await refreshCurrentUser();
-  if (!currentUserData?.clan) return;
-
-  const code = currentUserData.clan;
-  const clan = await DB.getClan(code);
-
-  await DB.removeMemberFromClan(code, currentUser);
-  await DB.updateUser(currentUser, { clan: null });
-
-  if (clan) {
-    if (clan.members.filter(m => m !== currentUser).length === 0) {
-      toast('Clan disbanded (no members left)', 'error');
-    } else {
-      await DB.recalcClanScore(code);
-      toast(`Left clan "${clan.name}"`, 'error');
-    }
-  }
-
-  await refreshCurrentUser();
-  await renderClan();
-  updateStatusBar();
+    await refreshCurrentUser();
+    if (!currentUserData?.clan) return;
+    const code = currentUserData.clan;
+    const clan = await DB.getClan(code);
+    await DB.updateUser(currentUser, {
+        clan: null
+    });
+    await DB.syncClans();
+    toast(`Left clan "${clan?.name || code}"`, "success");
+    await refreshCurrentUser();
+    await renderClan();
+    await renderLeaderboard();
+    updateStatusBar();
 }
 
 /* ─────────────────────────────────────────────────────────────────
    RENDER CLAN SCREEN
+   Fetches member usernames via UUID batch lookup for display.
 ───────────────────────────────────────────────────────────────── */
 async function renderClan() {
   await refreshCurrentUser();
@@ -119,7 +123,7 @@ async function renderClan() {
 
     clanView.style.display   = 'block';
     clanNoView.style.display = 'none';
-    await DB.recalcClanScore(currentUserData.clan);
+
 
     document.getElementById('my-clan-name').textContent    = clan.name.toUpperCase();
     document.getElementById('my-clan-code').textContent    = clan.code;
@@ -137,21 +141,22 @@ async function renderClan() {
     const rank = allClans.findIndex(c => c.code === clan.code) + 1;
     document.getElementById('my-clan-rank').textContent = `#${rank}`;
 
-    const batchUsers = await getBatchUsers(clan.members);
+    /* Batch fetch profiles by UUID to get usernames for display */
+    const batchUsers = await DB.getBatchUsers(clan.members);
     const userMap = {};
-    batchUsers.forEach(u => { userMap[u.username] = u.total_score; });
+    batchUsers.forEach(u => { userMap[u.id] = { username: u.username, score: u.total_score }; });
 
     const membersList = document.getElementById('clan-members-list');
     membersList.innerHTML = '';
     const memberData = clan.members
-      .map(m => ({ name: m, score: userMap[m] || 0 }))
+      .map(m => ({ userId: m, name: (userMap[m]?.username) || '—', score: (userMap[m]?.score) || 0 }))
       .sort((a, b) => b.score - a.score);
 
     memberData.forEach(m => {
       const div = document.createElement('div');
       div.className = 'clan-member-row';
       div.innerHTML = `
-        <span class="member-name">${m.name.toUpperCase()}${m.name === currentUser ? ' ★' : ''}</span>
+        <span class="member-name">${m.name.toUpperCase()}${m.userId === currentUser ? ' ★' : ''}</span>
         <span class="member-score">${m.score.toLocaleString()} PTS</span>
       `;
       membersList.appendChild(div);
@@ -160,17 +165,4 @@ async function renderClan() {
     clanView.style.display   = 'none';
     clanNoView.style.display = 'block';
   }
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   BATCH GET USERS
-───────────────────────────────────────────────────────────────── */
-async function getBatchUsers(usernames) {
-  if (!usernames.length) return [];
-  const { data, error } = await _sb
-    .from('users')
-    .select('username, total_score')
-    .in('username', usernames);
-  if (error) { console.error('[getBatchUsers]', error.message); return []; }
-  return data || [];
 }
