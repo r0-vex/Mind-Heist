@@ -3,6 +3,7 @@
 ![JavaScript](https://img.shields.io/badge/JavaScript-ES6-yellow)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-green)
 ![License](https://img.shields.io/badge/License-MIT-lightgrey)
+![Version](https://img.shields.io/badge/Version-v2.0.0-00ff66)
 
 # 🧠 Mind Heist
 
@@ -21,7 +22,9 @@ Unlike a traditional puzzle game, Mind Heist persists user progress, scores, ana
 
 ## 🌐 Live Demo
 
-Coming Soon (Vercel)
+🚀 **Play Mind Heist Online**
+
+👉 https://mindheist-puzzle.vercel.app/
 
 # ✨ Features
 
